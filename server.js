@@ -3,8 +3,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const useragent = require('express-useragent');
 const axios = require('axios');
-const fs = require('fs');
-const path = require('path');
+const mongoose = require('mongoose');
 
 const app = express();
 const server = http.createServer(app);
@@ -16,48 +15,46 @@ app.use(express.json());
 // CONFIGURATION
 const IMONETIZEIT_BASE_URL = 'https://kebkzw.dlstinguishedate.net/?utm_source=da57dc555e50572d&ban=fb&j1=1&s1=205200&s2=2060889';
 
+// GANTI DENGAN CONNECTION STRING MONGODB ATLAS ANDA
+const MONGODB_URI = 'mongodb+srv://idamanmu221_db_user:<db_password>@cluster0.oqtct5v.mongodb.net/?appName=Cluster0';
+
 const PASSWORDS = {
-    admin: 'sembuarang',
-    guest: 'akuuser'
+    admin: 'admin123',
+    guest: 'user123'
 };
 
-// PERSISTENT DATABASE LOGIC (database.json)
-const DB_FILE = path.join(__dirname, 'database.json');
+// CONNECT TO MONGODB ATLAS
+mongoose.connect(MONGODB_URI)
+    .then(() => console.log('[DB] Terhubung secara permanen ke MongoDB Atlas!'))
+    .catch(err => console.error('[DB] Gagal terhubung ke MongoDB:', err.message));
 
-let clicksHistory = [];
-let conversionsHistory = [];
+// SCHEMA DATABASE
+const ClickSchema = new mongoose.Schema({
+    id: Number,
+    isoDate: String,
+    sub_id: String,
+    ip: String,
+    country: String,
+    flag: String,
+    deviceInfo: Object,
+    visitorKey: String
+});
 
-// Fungsi membaca data dari database.json saat server dinyalakan
-function loadDatabase() {
-    try {
-        if (fs.existsSync(DB_FILE)) {
-            const rawData = fs.readFileSync(DB_FILE, 'utf8');
-            const parsed = JSON.parse(rawData);
-            clicksHistory = parsed.clicksHistory || [];
-            conversionsHistory = parsed.conversionsHistory || [];
-            console.log(`[DB] Berhasil memuat ${clicksHistory.length} data klik & ${conversionsHistory.length} data konversi.`);
-        } else {
-            saveDatabase();
-        }
-    } catch (err) {
-        console.error('[DB] Gagal memuat database.json:', err.message);
-    }
-}
+const ConversionSchema = new mongoose.Schema({
+    id: Number,
+    isoDate: String,
+    sub_id: String,
+    ip: String,
+    country: String,
+    flag: String,
+    deviceInfo: Object,
+    amountVal: Number,
+    amount: String,
+    visitorKey: String
+});
 
-// Fungsi menyimpan data ke database.json
-function saveDatabase() {
-    try {
-        const dataToSave = {
-            clicksHistory: clicksHistory,
-            conversionsHistory: conversionsHistory
-        };
-        fs.writeFileSync(DB_FILE, JSON.stringify(dataToSave, null, 2), 'utf8');
-    } catch (err) {
-        console.error('[DB] Gagal menyimpan ke database.json:', err.message);
-    }
-}
-
-loadDatabase();
+const ClickModel = mongoose.model('Click', ClickSchema);
+const ConversionModel = mongoose.model('Conversion', ConversionSchema);
 
 function getFlagEmoji(countryCode) {
     if (!countryCode || countryCode === 'XX' || countryCode === 'LOCAL') return '🌐';
@@ -95,7 +92,6 @@ function getDeviceIcons(ua) {
     };
 }
 
-// Fungsi Geolokasi yang Diperbarui (Mendukung IPv4 & IPv6 via Render Proxy)
 async function getGeoLocation(ip) {
     if (ip && ip.includes(',')) {
         ip = ip.split(',')[0].trim();
@@ -115,24 +111,14 @@ async function getGeoLocation(ip) {
             const countryCode = res.data.country_code;
             const countryName = res.data.country_name || 'Unknown';
             const flag = getFlagEmoji(countryCode);
-            return {
-                country: countryName,
-                countryCode: countryCode,
-                flag: flag,
-                ip: ip
-            };
+            return { country: countryName, countryCode: countryCode, flag: flag, ip: ip };
         }
     } catch (err) {
         try {
             const fallbackRes = await axios.get(`http://ip-api.com/json/${ip}`, { timeout: 3000 });
             if (fallbackRes.data && fallbackRes.data.status === 'success') {
                 const flag = getFlagEmoji(fallbackRes.data.countryCode);
-                return {
-                    country: fallbackRes.data.country,
-                    countryCode: fallbackRes.data.countryCode,
-                    flag: flag,
-                    ip: ip
-                };
+                return { country: fallbackRes.data.country, countryCode: fallbackRes.data.countryCode, flag: flag, ip: ip };
             }
         } catch (e) {}
     }
@@ -160,11 +146,10 @@ app.get('/click', async (req, res) => {
         visitorKey: `${geo.ip}_${req.useragent.source}`
     };
 
-    clicksHistory.unshift(clickObj);
-    saveDatabase();
+    // Simpan permanen ke MongoDB
+    await ClickModel.create(clickObj);
     io.emit('new-click', clickObj);
 
-    // Format URL Akhir (Hanya mengisi s3, s5, dan click_id)
     const encodedSubId = encodeURIComponent(subId);
     const destinationUrl = `${IMONETIZEIT_BASE_URL}&s3=${encodedSubId}&s5=${encodedSubId}&click_id=${encodedSubId}`;
 
@@ -188,11 +173,15 @@ app.post('/api/force-logout', (req, res) => {
     res.json({ status: 'ok', message: 'Semua sesi berhasil dikeluarkan.' });
 });
 
-app.get('/api/initial-data', (req, res) => {
-    res.json({
-        clicksHistory: clicksHistory,
-        conversionsHistory: conversionsHistory
-    });
+// Endpoint mengambil initial data permanen dari MongoDB saat UI dimuat
+app.get('/api/initial-data', async (req, res) => {
+    try {
+        const clicksHistory = await ClickModel.find().sort({ _id: -1 }).limit(1000);
+        const conversionsHistory = await ConversionModel.find().sort({ _id: -1 }).limit(1000);
+        res.json({ clicksHistory, conversionsHistory });
+    } catch (err) {
+        res.status(500).json({ error: 'Gagal mengambil data' });
+    }
 });
 
 app.post('/api/track-click', async (req, res) => {
@@ -213,8 +202,7 @@ app.post('/api/track-click', async (req, res) => {
         visitorKey: `${geo.ip}_${req.useragent.source}`
     };
 
-    clicksHistory.unshift(clickObj);
-    saveDatabase();
+    await ClickModel.create(clickObj);
     io.emit('new-click', clickObj);
     res.json({ status: 'ok' });
 });
@@ -245,8 +233,7 @@ app.post('/api/track-conversion', async (req, res) => {
         visitorKey: `${geo.ip}_${req.useragent.source}`
     };
 
-    conversionsHistory.unshift(convObj);
-    saveDatabase();
+    await ConversionModel.create(convObj);
     io.emit('new-conversion', convObj);
     res.json({ status: 'ok' });
 });
@@ -998,6 +985,7 @@ app.get('/', (req, res) => {
     `);
 });
 
-server.listen(3000, () => {
-    console.log("Server berjalan di http://localhost:3000");
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+    console.log(`Server berjalan di port ${PORT}`);
 });
