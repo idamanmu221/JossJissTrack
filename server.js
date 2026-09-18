@@ -236,7 +236,7 @@ app.post('/api/track-conversion', async (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// Serve Dashboard UI (Mobile Optimized + Filter Today + Max 100 Live Clicks)
+// Serve Dashboard UI (Filter Preset UTC Based)
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -475,11 +475,11 @@ app.get('/', (req, res) => {
     <div id="main">
 
         <div class="filter-bar">
-            <input type="text" id="startDatePicker" placeholder="Dari Tanggal">
-            <input type="text" id="endDatePicker" placeholder="Sampai Tanggal">
-            <button class="btn-preset" onclick="setPreset('today')" style="background:#3b82f6; color:white;">Hari Ini</button>
-            <button class="btn-preset" onclick="setPreset('week')">Minggu Ini</button>
-            <button class="btn-preset" onclick="setPreset('month')">Bulan Ini</button>
+            <input type="text" id="startDatePicker" placeholder="Dari Tanggal (UTC)">
+            <input type="text" id="endDatePicker" placeholder="Sampai Tanggal (UTC)">
+            <button class="btn-preset" onclick="setPreset('today')" style="background:#3b82f6; color:white;">Hari Ini (UTC)</button>
+            <button class="btn-preset" onclick="setPreset('week')">Minggu Ini (UTC)</button>
+            <button class="btn-preset" onclick="setPreset('month')">Bulan Ini (UTC)</button>
             <button class="btn-preset" onclick="resetDateFilter()">Reset</button>
         </div>
 
@@ -712,26 +712,31 @@ app.get('/', (req, res) => {
             }
         });
 
+        // PRESET FILTER TANGGAL BERDASARKAN UTC PERIODE
         function setPreset(preset) {
             const now = new Date();
             let start = new Date();
+            let end = new Date();
             
             if (preset === 'today') {
-                start.setHours(0, 0, 0, 0);
+                // Awal hari jam 00:00:00 UTC
+                start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+                // Akhir hari jam 23:59:59 UTC
+                end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
             } else if (preset === 'week') {
                 const day = now.getUTCDay() || 7;
-                start.setUTCDate(now.getUTCDate() - day + 1);
-                start.setUTCHours(0, 0, 0, 0);
+                start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day + 1, 0, 0, 0, 0));
+                end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
             } else if (preset === 'month') {
-                start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0));
+                start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
+                end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
             }
 
             fpStart.setDate(start);
-            fpEnd.setDate(now);
+            fpEnd.setDate(end);
 
             filterStartDate = start;
-            filterEndDate = new Date();
-            filterEndDate.setHours(23, 59, 59, 999);
+            filterEndDate = end;
 
             renderAnalytics();
         }
@@ -844,7 +849,6 @@ app.get('/', (req, res) => {
             const tbodyClick = document.getElementById('tbl-click');
             tbodyClick.innerHTML = '';
             
-            // Ambil maksimal 100 klik paling atas saja untuk ditampilkan di tabel
             const limitedClicksForDisplay = filteredClicks.slice(0, 100);
 
             if (limitedClicksForDisplay.length === 0) {
@@ -871,7 +875,7 @@ app.get('/', (req, res) => {
                 });
             }
 
-            // HITUNG STATISTIK KESELURUHAN (MENGGUNAKAN SELURUH DATA FILTERED CLICKS, BUKAN CUMA 100)
+            // HITUNG STATISTIK KESELURUHAN (MENGGUNAKAN SELURUH DATA FILTERED CLICKS)
             const subIdStats = {};
             const globalUniques = new Set();
             let totalClicks = 0, totalConversions = 0, totalRevenue = 0;
@@ -899,7 +903,7 @@ app.get('/', (req, res) => {
                 subIdStats[c.sub_id].revenue += c.amountVal;
             });
 
-            // UPDATE STATS CARDS & TOTAL OVERALL (TETAP SAMA MESKIPUN LIVE CLICK DIBATASI 100)
+            // UPDATE STATS CARDS
             document.getElementById('card-clicks').innerText = totalClicks;
             document.getElementById('card-uniques').innerText = globalUniques.size;
             document.getElementById('card-conversions').innerText = totalConversions;
