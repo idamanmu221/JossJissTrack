@@ -27,7 +27,7 @@ const DB_FILE = path.join(__dirname, 'database.json');
 let clicksHistory = [];
 let conversionsHistory = [];
 
-// Fungsi membaca data dari database.json saat server pertama kali dinyalakan
+// Fungsi membaca data dari database.json saat server dinyalakan
 function loadDatabase() {
     try {
         if (fs.existsSync(DB_FILE)) {
@@ -37,14 +37,14 @@ function loadDatabase() {
             conversionsHistory = parsed.conversionsHistory || [];
             console.log(`[DB] Berhasil memuat ${clicksHistory.length} data klik & ${conversionsHistory.length} data konversi.`);
         } else {
-            saveDatabase(); // Buat file jika belum ada
+            saveDatabase();
         }
     } catch (err) {
         console.error('[DB] Gagal memuat database.json:', err.message);
     }
 }
 
-// Fungsi menyimpan data ke database.json secara otomatis
+// Fungsi menyimpan data ke database.json
 function saveDatabase() {
     try {
         const dataToSave = {
@@ -57,7 +57,6 @@ function saveDatabase() {
     }
 }
 
-// Jalankan fungsi loadDatabase
 loadDatabase();
 
 function getFlagEmoji(countryCode) {
@@ -96,22 +95,48 @@ function getDeviceIcons(ua) {
     };
 }
 
+// Fungsi Geolokasi yang Diperbarui (Mendukung IPv4 & IPv6 via Render Proxy)
 async function getGeoLocation(ip) {
-    if (ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168') || ip.startsWith('::ffff:127')) {
+    if (ip && ip.includes(',')) {
+        ip = ip.split(',')[0].trim();
+    }
+    
+    if (ip && ip.startsWith('::ffff:')) {
+        ip = ip.replace('::ffff:', '');
+    }
+
+    if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168') || ip.startsWith('10.')) {
         return { country: 'Indonesia (Local)', countryCode: 'ID', flag: '🇮🇩', ip: '127.0.0.1' };
     }
+
     try {
-        const res = await axios.get(`http://ip-api.com/json/${ip}`);
-        if (res.data.status === 'success') {
-            const flag = getFlagEmoji(res.data.countryCode);
-            return { 
-                country: res.data.country, 
-                countryCode: res.data.countryCode, 
-                flag: flag, 
-                ip: ip 
+        const res = await axios.get(`https://ipapi.co/${ip}/json/`, { timeout: 3000 });
+        if (res.data && res.data.country_code && res.data.country_code !== 'UNDEFINED') {
+            const countryCode = res.data.country_code;
+            const countryName = res.data.country_name || 'Unknown';
+            const flag = getFlagEmoji(countryCode);
+            return {
+                country: countryName,
+                countryCode: countryCode,
+                flag: flag,
+                ip: ip
             };
         }
-    } catch (err) {}
+    } catch (err) {
+        try {
+            const fallbackRes = await axios.get(`http://ip-api.com/json/${ip}`, { timeout: 3000 });
+            if (fallbackRes.data && fallbackRes.data.status === 'success') {
+                const flag = getFlagEmoji(fallbackRes.data.countryCode);
+                return {
+                    country: fallbackRes.data.country,
+                    countryCode: fallbackRes.data.countryCode,
+                    flag: flag,
+                    ip: ip
+                };
+            }
+        } catch (e) {}
+    }
+
     return { country: 'Unknown', countryCode: 'XX', flag: '🌐', ip: ip };
 }
 
@@ -136,7 +161,7 @@ app.get('/click', async (req, res) => {
     };
 
     clicksHistory.unshift(clickObj);
-    saveDatabase(); // Simpan ke file database.json
+    saveDatabase();
     io.emit('new-click', clickObj);
 
     // Format URL Akhir (Hanya mengisi s3, s5, dan click_id)
@@ -163,7 +188,6 @@ app.post('/api/force-logout', (req, res) => {
     res.json({ status: 'ok', message: 'Semua sesi berhasil dikeluarkan.' });
 });
 
-// Endpoint mengambil initial data saat UI dimuat/di-refresh
 app.get('/api/initial-data', (req, res) => {
     res.json({
         clicksHistory: clicksHistory,
@@ -190,7 +214,7 @@ app.post('/api/track-click', async (req, res) => {
     };
 
     clicksHistory.unshift(clickObj);
-    saveDatabase(); // Simpan ke file database.json
+    saveDatabase();
     io.emit('new-click', clickObj);
     res.json({ status: 'ok' });
 });
@@ -222,7 +246,7 @@ app.post('/api/track-conversion', async (req, res) => {
     };
 
     conversionsHistory.unshift(convObj);
-    saveDatabase(); // Simpan ke file database.json
+    saveDatabase();
     io.emit('new-conversion', convObj);
     res.json({ status: 'ok' });
 });
