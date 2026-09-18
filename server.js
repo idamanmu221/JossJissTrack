@@ -18,7 +18,7 @@ const IMONETIZEIT_BASE_URL = 'https://kebkzw.dlstinguishedate.net/?utm_source=da
 
 const PASSWORDS = {
     admin: 'admin123',
-    guest: 'user123'
+    guest: 'akuuser'
 };
 
 // PERSISTENT DATABASE LOGIC (database.json)
