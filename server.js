@@ -174,8 +174,8 @@ app.post('/api/force-logout', (req, res) => {
 
 app.get('/api/initial-data', async (req, res) => {
     try {
-        const clicksHistory = await ClickModel.find().sort({ _id: -1 }).limit(1000);
-        const conversionsHistory = await ConversionModel.find().sort({ _id: -1 }).limit(1000);
+        const clicksHistory = await ClickModel.find().sort({ _id: -1 }).limit(5000);
+        const conversionsHistory = await ConversionModel.find().sort({ _id: -1 }).limit(5000);
         res.json({ clicksHistory, conversionsHistory });
     } catch (err) {
         res.status(500).json({ error: 'Gagal mengambil data' });
@@ -236,7 +236,7 @@ app.post('/api/track-conversion', async (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// Serve Dashboard UI (Mobile Optimized)
+// Serve Dashboard UI (Mobile Optimized + Filter Today + Max 100 Live Clicks)
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -445,7 +445,7 @@ app.get('/', (req, res) => {
         <h4 style="margin-bottom:8px; color:#94a3b8; font-size:12px;">NAVIGASI VIEWS</h4>
         <button class="menu-item" onclick="switchView('subid')">📊 Total Performance Sub ID</button>
         <button class="menu-item" onclick="switchView('conversion')">🛒 Live Conversion</button>
-        <button class="menu-item" onclick="switchView('click')">⚡ Live Klik</button>
+        <button class="menu-item" onclick="switchView('click')">⚡ Live Klik (Max 100)</button>
 
         <div id="adminPanel" class="test-box hidden">
             <p style="font-size:11px; font-weight:bold; color:#38bdf8;">🔗 SMARTLINK GENERATOR:</p>
@@ -477,6 +477,7 @@ app.get('/', (req, res) => {
         <div class="filter-bar">
             <input type="text" id="startDatePicker" placeholder="Dari Tanggal">
             <input type="text" id="endDatePicker" placeholder="Sampai Tanggal">
+            <button class="btn-preset" onclick="setPreset('today')" style="background:#3b82f6; color:white;">Hari Ini</button>
             <button class="btn-preset" onclick="setPreset('week')">Minggu Ini</button>
             <button class="btn-preset" onclick="setPreset('month')">Bulan Ini</button>
             <button class="btn-preset" onclick="resetDateFilter()">Reset</button>
@@ -541,7 +542,9 @@ app.get('/', (req, res) => {
         </section>
 
         <section id="click-sec" class="panel hidden">
-            <h3 style="font-size:15px; margin-bottom: 8px;">⚡ Live Klik</h3>
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <h3 style="font-size:15px;">⚡ Live Klik <span style="font-size:11px; color:#64748b; font-weight:normal;">(Menampilkan 100 Klik Terakhir)</span></h3>
+            </div>
             <div class="table-responsive">
                 <table>
                     <thead>
@@ -713,7 +716,9 @@ app.get('/', (req, res) => {
             const now = new Date();
             let start = new Date();
             
-            if (preset === 'week') {
+            if (preset === 'today') {
+                start.setHours(0, 0, 0, 0);
+            } else if (preset === 'week') {
                 const day = now.getUTCDay() || 7;
                 start.setUTCDate(now.getUTCDate() - day + 1);
                 start.setUTCHours(0, 0, 0, 0);
@@ -800,6 +805,7 @@ app.get('/', (req, res) => {
                 return true;
             });
 
+            // TAB CONVERSION
             const tbodyConv = document.getElementById('tbl-conv');
             tbodyConv.innerHTML = '';
             
@@ -834,12 +840,17 @@ app.get('/', (req, res) => {
                 });
             }
 
+            // TAB LIVE CLICK (PEMBATASAN 100 KLIK TERBARU)
             const tbodyClick = document.getElementById('tbl-click');
             tbodyClick.innerHTML = '';
-            if (filteredClicks.length === 0) {
+            
+            // Ambil maksimal 100 klik paling atas saja untuk ditampilkan di tabel
+            const limitedClicksForDisplay = filteredClicks.slice(0, 100);
+
+            if (limitedClicksForDisplay.length === 0) {
                 tbodyClick.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data klik.</td></tr>';
             } else {
-                filteredClicks.forEach(c => {
+                limitedClicksForDisplay.forEach(c => {
                     const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
                     const dev = c.deviceInfo || { osIcon: 'fa-desktop', browserIcon: 'fa-globe', osName: 'Desktop', browserName: 'Browser' };
 
@@ -860,6 +871,7 @@ app.get('/', (req, res) => {
                 });
             }
 
+            // HITUNG STATISTIK KESELURUHAN (MENGGUNAKAN SELURUH DATA FILTERED CLICKS, BUKAN CUMA 100)
             const subIdStats = {};
             const globalUniques = new Set();
             let totalClicks = 0, totalConversions = 0, totalRevenue = 0;
@@ -887,7 +899,7 @@ app.get('/', (req, res) => {
                 subIdStats[c.sub_id].revenue += c.amountVal;
             });
 
-            // UPDATE CARD STATS MOBILE
+            // UPDATE STATS CARDS & TOTAL OVERALL (TETAP SAMA MESKIPUN LIVE CLICK DIBATASI 100)
             document.getElementById('card-clicks').innerText = totalClicks;
             document.getElementById('card-uniques').innerText = globalUniques.size;
             document.getElementById('card-conversions').innerText = totalConversions;
