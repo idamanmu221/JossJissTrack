@@ -16,11 +16,11 @@ app.use(express.json());
 const IMONETIZEIT_BASE_URL = 'https://kebkzw.dlstinguishedate.net/?utm_source=da57dc555e50572d&ban=fb&j1=1&s1=205200&s2=2060889';
 
 // GANTI DENGAN CONNECTION STRING MONGODB ATLAS ANDA
-const MONGODB_URI = 'mongodb+srv://idamanmu221_db_user:qbOqeivECV03o5ci@cluster0.oqtct5v.mongodb.net/?appName=Cluster0';
+const MONGODB_URI = 'mongodb+srv://idamanmu221_db_user:eWoay7EzZ4SYskzI>@cluster0.oqtct5v.mongodb.net/?appName=Cluster0';
 
 const PASSWORDS = {
-    admin: 'sembuarang',
-    guest: 'nguelidd'
+    admin: 'admin123',
+    guest: 'user123'
 };
 
 // CONNECT TO MONGODB ATLAS
@@ -146,7 +146,6 @@ app.get('/click', async (req, res) => {
         visitorKey: `${geo.ip}_${req.useragent.source}`
     };
 
-    // Simpan permanen ke MongoDB
     await ClickModel.create(clickObj);
     io.emit('new-click', clickObj);
 
@@ -173,7 +172,6 @@ app.post('/api/force-logout', (req, res) => {
     res.json({ status: 'ok', message: 'Semua sesi berhasil dikeluarkan.' });
 });
 
-// Endpoint mengambil initial data permanen dari MongoDB saat UI dimuat
 app.get('/api/initial-data', async (req, res) => {
     try {
         const clicksHistory = await ClickModel.find().sort({ _id: -1 }).limit(1000);
@@ -238,14 +236,14 @@ app.post('/api/track-conversion', async (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// Serve Dashboard UI
+// Serve Dashboard UI (Mobile Optimized)
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>JossJiss - Analytics Dashboard</title>
     <script src="/socket.io/socket.io.js"></script>
     
@@ -279,27 +277,27 @@ app.get('/', (req, res) => {
         }
 
         * { 
-            box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; 
+            box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
             transition: background-color 0.2s, color 0.2s;
-            -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none;
+            -webkit-user-select: none; user-select: none;
         }
 
-        input {
-            -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; user-select: text;
+        input, select, button {
+            -webkit-user-select: text; user-select: text;
         }
 
-        body { background: var(--bg-color); color: var(--text-color); }
+        body { background: var(--bg-color); color: var(--text-color); overflow-x: hidden; }
 
         #loginOverlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: #0f172a; z-index: 99999; display: flex; align-items: center; justify-content: center;
+            background: #0f172a; z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 15px;
         }
         .login-card {
-            background: #1e293b; padding: 35px 30px; border-radius: 12px; width: 340px;
+            background: #1e293b; padding: 30px 20px; border-radius: 12px; width: 100%; max-width: 340px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; color: white;
         }
         .login-title {
-            font-size: 32px; font-weight: 800; color: #38bdf8; letter-spacing: 1.5px;
+            font-size: 28px; font-weight: 800; color: #38bdf8; letter-spacing: 1.5px;
             margin-bottom: 5px; text-transform: uppercase;
         }
         .login-subtitle { font-size: 13px; color: #94a3b8; margin-bottom: 20px; }
@@ -311,102 +309,102 @@ app.get('/', (req, res) => {
             width: 100%; padding: 12px; border-radius: 6px; border: none;
             background: #3b82f6; color: white; font-weight: bold; cursor: pointer; font-size: 15px;
         }
-        .login-card button:hover { background: #2563eb; }
-        .login-error { color: #ef4444; font-size: 13px; margin-top: 10px; display: none; }
-        
-        header { 
-            background: var(--header-bg); color: white; padding: 15px 20px; 
-            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 15px; 
-            position: relative;
-        }
-        .header-left { display: flex; align-items: center; gap: 15px; }
-        
-        .header-center-title {
-            position: absolute; left: 50%; transform: translateX(-50%);
-            font-size: 24px; font-weight: 800; color: #38bdf8; letter-spacing: 2px; text-transform: uppercase;
-        }
-        @media (max-width: 900px) {
-            .header-center-title { position: static; transform: none; width: 100%; text-align: center; order: 3; }
-        }
 
-        .header-right { display: flex; align-items: center; gap: 12px; }
+        header { 
+            background: var(--header-bg); color: white; padding: 12px 15px; 
+            display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+            position: sticky; top: 0; z-index: 1000;
+        }
+        .header-left { display: flex; align-items: center; gap: 10px; }
+        .header-title-mob { font-size: 18px; font-weight: 800; color: #38bdf8; letter-spacing: 1px; text-transform: uppercase; }
+
+        .header-right { display: flex; align-items: center; gap: 8px; }
 
         .clock-container {
-            display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.2);
-            border: 1px solid #334155; padding: 6px 12px; border-radius: 6px;
+            display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.2);
+            border: 1px solid #334155; padding: 4px 8px; border-radius: 6px; font-size: 12px;
         }
         .timezone-select {
             background: #1e293b; color: #38bdf8; border: 1px solid #475569;
-            padding: 4px 8px; border-radius: 4px; font-size: 13px; font-weight: bold; cursor: pointer; outline: none;
+            padding: 2px 4px; border-radius: 4px; font-size: 11px; font-weight: bold; outline: none;
         }
-        .utc-clock-box { font-size: 14px; color: #38bdf8; font-weight: bold; font-family: monospace; }
+        .utc-clock-box { font-size: 12px; color: #38bdf8; font-weight: bold; font-family: monospace; }
 
         .btn-theme, .btn-logout {
-            background: #334155; color: white; border: none; padding: 8px 12px;
+            background: #334155; color: white; border: none; padding: 8px 10px;
             border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;
         }
-        .btn-theme:hover, .btn-logout:hover { background: #475569; }
 
         .btn-menu {
-            background: #3b82f6; color: white; border: none; padding: 10px 18px;
-            font-size: 16px; font-weight: bold; border-radius: 6px; cursor: pointer;
+            background: #3b82f6; color: white; border: none; padding: 8px 12px;
+            font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer;
         }
-        .btn-menu:hover { background: #2563eb; }
 
         .menu-dropdown {
-            display: none; position: absolute; top: 65px; left: 15px;
-            background: #0f172a; border-radius: 8px; padding: 15px; width: 320px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.3); z-index: 9999; color: white;
+            display: none; position: fixed; top: 55px; left: 10px; right: 10px; max-width: 360px;
+            background: #0f172a; border-radius: 8px; padding: 15px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 9999; color: white; border: 1px solid #334155;
         }
         .menu-dropdown.show { display: block !important; }
         .menu-dropdown button.menu-item { 
             display: block; width: 100%; text-align: left; background: none; border: none;
-            color: #cbd5e1; padding: 12px 0; font-size: 15px; cursor: pointer;
+            color: #cbd5e1; padding: 10px 0; font-size: 14px; cursor: pointer;
             border-bottom: 1px solid #334155; 
         }
-        .menu-dropdown button.menu-item:hover { color: white; }
-        
-        .test-box { margin-top: 15px; background: #1e293b; padding: 12px; border-radius: 6px; border: 1px solid #334155; }
-        .test-box input, .test-box select, .test-box button { width: 100%; margin-top: 8px; padding: 8px; border-radius: 4px; border: none; }
+
+        .test-box { margin-top: 10px; background: #1e293b; padding: 10px; border-radius: 6px; border: 1px solid #334155; }
+        .test-box input, .test-box select, .test-box button { width: 100%; margin-top: 6px; padding: 8px; border-radius: 4px; border: none; font-size: 13px; }
         .test-box input { background: #0f172a; color: white; border: 1px solid #334155; }
         .test-box button { background: #10b981; color: white; cursor: pointer; font-weight: bold; }
-        .btn-force-logout { background: #ef4444 !important; margin-top: 15px !important; }
+        .btn-force-logout { background: #ef4444 !important; margin-top: 10px !important; }
 
-        #main { padding: 20px; }
-        .panel { background: var(--panel-bg); padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 10px; }
+        #main { padding: 10px; }
+        .panel { background: var(--panel-bg); padding: 12px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); margin-top: 10px; }
         
         .filter-bar {
-            display: flex; gap: 10px; flex-wrap: wrap; align-items: center;
-            background: var(--sub-panel-bg); padding: 12px; border-radius: 6px; margin-bottom: 15px;
+            display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+            background: var(--sub-panel-bg); padding: 10px; border-radius: 6px; margin-bottom: 10px; font-size: 13px;
         }
         .filter-bar input[type="text"] {
-            padding: 8px 12px; border: 1px solid var(--border-color); border-radius: 5px; font-size: 14px; outline: none;
-            background: var(--panel-bg); color: var(--text-color);
+            padding: 6px 10px; border: 1px solid var(--border-color); border-radius: 5px; font-size: 13px; outline: none;
+            background: var(--panel-bg); color: var(--text-color); flex: 1; min-width: 120px;
         }
         .btn-preset {
-            padding: 8px 12px; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 5px;
-            cursor: pointer; font-size: 13px; font-weight: bold; color: var(--text-color);
+            padding: 6px 10px; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 5px;
+            cursor: pointer; font-size: 12px; font-weight: bold; color: var(--text-color); flex: 1; text-align: center;
         }
-        .btn-preset:hover { background: var(--border-color); }
+
+        /* CARD STATS MODERNE FOR MOBILE */
+        .summary-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;
+        }
+        @media (min-width: 600px) {
+            .summary-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+        .stat-card {
+            background: var(--sub-panel-bg); padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); text-align: center;
+        }
+        .stat-card .label { font-size: 11px; color: #64748b; font-weight: bold; text-transform: uppercase; }
+        .stat-card .value { font-size: 16px; font-weight: 800; margin-top: 4px; }
+
+        /* SCROLLABLE TABLE CONTAINERS FOR MOBILE */
+        .table-responsive {
+            width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 5px;
+        }
         
-        .badge-subid { background: var(--badge-bg); color: var(--badge-text); padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 12px; }
-        .flag-icon { font-size: 18px; margin-right: 6px; vertical-align: middle; }
+        table { width: 100%; border-collapse: collapse; text-align: left; min-width: 500px; }
+        th, td { padding: 10px 8px; border-bottom: 1px solid var(--border-color); font-size: 13px; white-space: nowrap; }
+        th { background: var(--table-header); }
+        
+        .badge-subid { background: var(--badge-bg); color: var(--badge-text); padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+        .flag-icon { font-size: 16px; margin-right: 4px; vertical-align: middle; }
         
         .device-badge {
-            display: inline-flex; align-items: center; gap: 6px;
-            background: var(--sub-panel-bg); padding: 4px 8px; border-radius: 4px; font-size: 13px; color: var(--text-color);
+            display: inline-flex; align-items: center; gap: 4px;
+            background: var(--sub-panel-bg); padding: 3px 6px; border-radius: 4px; font-size: 11px; color: var(--text-color);
         }
-        .device-badge i { font-size: 14px; color: #3b82f6; }
 
         .hidden { display: none !important; }
-        
-        table { width: 100%; border-collapse: collapse; text-align: left; margin-top: 5px; }
-        th, td { padding: 12px 10px; border-bottom: 1px solid var(--border-color); font-size: 14px; }
-        th { background: var(--table-header); }
-        tfoot tr { background: var(--table-header); font-weight: bold; }
-        
-        .highlight { animation: flash 1.5s ease-out; }
-        @keyframes flash { 0% { background: #dbeafe; } 100% { background: transparent; } }
     </style>
 </head>
 <body>
@@ -417,156 +415,149 @@ app.get('/', (req, res) => {
             <div class="login-subtitle">Realtime Analytics System</div>
             <input type="password" id="passInput" placeholder="Masukkan Password..." onkeyup="if(event.key==='Enter') attemptLogin()">
             <button onclick="attemptLogin()">LOGIN</button>
-            <div id="loginError" class="login-error">Password Salah!</div>
+            <div id="loginError" style="color:#ef4444; font-size:12px; margin-top:10px; display:none;">Password Salah!</div>
         </div>
     </div>
 
     <header>
         <div class="header-left">
             <button class="btn-menu" id="toggleBtn">☰ Menu</button>
-        </div>
-
-        <div class="header-center-title">
-            JossJiss
+            <span class="header-title-mob">JossJiss</span>
         </div>
 
         <div class="header-right">
             <div class="clock-container">
                 <select id="tzSelect" class="timezone-select" onchange="onTimezoneChange()">
-                    <option value="0" selected>UTC +0</option>
-                    <option value="7">UTC +7 (WIB)</option>
+                    <option value="0" selected>UTC+0</option>
+                    <option value="7">WIB</option>
                 </select>
                 <div class="utc-clock-box">
-                    <span id="liveClock">Loading Clock...</span>
+                    <span id="liveClock">00:00:00</span>
                 </div>
             </div>
 
-            <button class="btn-theme" onclick="toggleTheme()" title="Ubah Tema">
-                <i id="themeIcon" class="fa-solid fa-moon"></i>
-            </button>
-
-            <button class="btn-logout" onclick="logoutCurrentSession()" title="Logout">
-                <i class="fa-solid fa-right-from-bracket"></i> Logout
-            </button>
+            <button class="btn-theme" onclick="toggleTheme()"><i id="themeIcon" class="fa-solid fa-moon"></i></button>
+            <button class="btn-logout" onclick="logoutCurrentSession()"><i class="fa-solid fa-right-from-bracket"></i></button>
         </div>
     </header>
 
     <div id="navMenu" class="menu-dropdown">
-        <h4 style="margin-bottom:10px; color:#94a3b8;">NAVIGASI VIEWS</h4>
-        <button class="menu-item" onclick="switchView('subid')">📊 Total Performance per Sub ID</button>
+        <h4 style="margin-bottom:8px; color:#94a3b8; font-size:12px;">NAVIGASI VIEWS</h4>
+        <button class="menu-item" onclick="switchView('subid')">📊 Total Performance Sub ID</button>
         <button class="menu-item" onclick="switchView('conversion')">🛒 Live Conversion</button>
         <button class="menu-item" onclick="switchView('click')">⚡ Live Klik</button>
 
         <div id="adminPanel" class="test-box hidden">
-            <!-- SMARTLINK GENERATOR -->
-            <p style="font-size:12px; font-weight:bold; color:#38bdf8;">🔗 SMARTLINK GENERATOR:</p>
-            <input type="text" id="genSubId" placeholder="Ketik Sub ID (misal: fb_ads)...">
+            <p style="font-size:11px; font-weight:bold; color:#38bdf8;">🔗 SMARTLINK GENERATOR:</p>
+            <input type="text" id="genSubId" placeholder="Sub ID (misal: fb_ads)...">
             <button onclick="generateLink()" style="background:#3b82f6;">Buat Link Tracking</button>
             
-            <div id="genResultBox" style="display:none; margin-top:10px;">
-                <input type="text" id="generatedUrl" readonly onclick="this.select()" style="font-size:12px; color:#10b981;">
-                <button onclick="copyGeneratedLink()" style="background:#059669; margin-top:5px;">📋 Salin Link</button>
+            <div id="genResultBox" style="display:none; margin-top:8px;">
+                <input type="text" id="generatedUrl" readonly onclick="this.select()" style="font-size:11px; color:#10b981;">
+                <button onclick="copyGeneratedLink()" style="background:#059669; margin-top:4px;">📋 Salin Link</button>
             </div>
 
-            <hr style="border:0; border-top:1px solid #334155; margin:15px 0;">
+            <hr style="border:0; border-top:1px solid #334155; margin:10px 0;">
 
-            <!-- SIMULATOR -->
-            <p style="font-size:12px; font-weight:bold; color:#10b981;">⚡ SIMULATOR:</p>
+            <p style="font-size:11px; font-weight:bold; color:#10b981;">⚡ SIMULATOR:</p>
             <select id="sim-subid">
                 <option value="sub1">Sub ID: sub1</option>
                 <option value="sub2">Sub ID: sub2</option>
-                <option value="sub3">Sub ID: sub3</option>
                 <option value="campaign_fb">Sub ID: campaign_fb</option>
             </select>
-            <button onclick="triggerClick()">Simulasi Klik / Hit</button>
+            <button onclick="triggerClick()">Simulasi Klik</button>
             <button onclick="triggerConv()">Simulasi Konversi</button>
             
-            <button class="btn-force-logout" onclick="triggerForceLogout()">🔒 Force Logout All Users</button>
+            <button class="btn-force-logout" onclick="triggerForceLogout()">🔒 Force Logout All</button>
         </div>
     </div>
 
     <div id="main">
 
         <div class="filter-bar">
-            <strong>📅 Filter Tanggal:</strong>
-            <input type="text" id="startDatePicker" placeholder="Dari Tanggal" style="width: 140px;">
-            <input type="text" id="endDatePicker" placeholder="Sampai Tanggal" style="width: 140px;">
-            
-            <button class="btn-preset" onclick="setPreset('week')">Minggu Ini (Week)</button>
-            <button class="btn-preset" onclick="setPreset('month')">Bulan Ini (Month)</button>
-            <button class="btn-preset" onclick="resetDateFilter()">Reset Tanggal</button>
+            <input type="text" id="startDatePicker" placeholder="Dari Tanggal">
+            <input type="text" id="endDatePicker" placeholder="Sampai Tanggal">
+            <button class="btn-preset" onclick="setPreset('week')">Minggu Ini</button>
+            <button class="btn-preset" onclick="setPreset('month')">Bulan Ini</button>
+            <button class="btn-preset" onclick="resetDateFilter()">Reset</button>
+        </div>
+
+        <!-- MOBILE SUMMARY STATS CARDS -->
+        <div class="summary-grid">
+            <div class="stat-card">
+                <div class="label">Total Clicks</div>
+                <div class="value" id="card-clicks">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Uniques</div>
+                <div class="value" id="card-uniques" style="color:#8b5cf6;">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Conversions</div>
+                <div class="value" id="card-conversions" style="color:#3b82f6;">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="label">Revenue</div>
+                <div class="value" id="card-revenue" style="color:#10b981;">$0.00</div>
+            </div>
         </div>
         
         <section id="subid-sec" class="panel">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
-                <h2>📊 Performance Summary per Sub ID</h2>
-                <input type="text" id="searchSubId" placeholder="🔍 Cari Sub ID..." onkeyup="renderAnalytics()" style="padding: 8px 12px; width: 220px; border: 1px solid var(--border-color); border-radius: 5px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <h3 style="font-size:15px;">📊 Performance per Sub ID</h3>
+                <input type="text" id="searchSubId" placeholder="🔍 Cari..." onkeyup="renderAnalytics()" style="padding: 6px 8px; width: 110px; border: 1px solid var(--border-color); border-radius: 5px; font-size:12px;">
             </div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Sub ID</th>
-                        <th>Hits</th>
-                        <th>Clicks</th>
-                        <th>Uniques</th>
-                        <th>Conversions</th>
-                        <th>CR (%)</th>
-                        <th>Revenue ($)</th>
-                    </tr>
-                </thead>
-                <tbody id="tbl-subid-body"></tbody>
-                <tfoot>
-                    <tr>
-                        <td>TOTAL OVERALL</td>
-                        <td id="total-overall-hits">0</td>
-                        <td id="total-overall-clicks">0</td>
-                        <td id="total-overall-uniques" style="color:#8b5cf6;">0</td>
-                        <td id="total-overall-conversions">0</td>
-                        <td id="total-overall-cr" style="color:#3b82f6;">0.00%</td>
-                        <td id="total-overall-revenue" style="color:#10b981;">$0.00</td>
-                    </tr>
-                </tfoot>
-            </table>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sub ID</th>
+                            <th>Hits</th>
+                            <th>Clicks</th>
+                            <th>Uniques</th>
+                            <th>Conversions</th>
+                            <th>CR (%)</th>
+                            <th>Revenue ($)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbl-subid-body"></tbody>
+                </table>
+            </div>
         </section>
 
         <section id="conv-sec" class="panel">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 10px;">
-                <h2>🛒 Live Conversion</h2>
-                <input type="text" id="searchConv" placeholder="🔍 Cari IP, Sub ID, Negara..." onkeyup="renderAnalytics()" style="padding: 8px 12px; width: 250px; border: 1px solid var(--border-color); border-radius: 5px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px;">
+                <h3 style="font-size:15px;">🛒 Live Conversion</h3>
+                <input type="text" id="searchConv" placeholder="🔍 Cari..." onkeyup="renderAnalytics()" style="padding: 6px 8px; width: 110px; border: 1px solid var(--border-color); border-radius: 5px; font-size:12px;">
             </div>
-            <table>
-                <thead>
-                    <tr><th class="th-time">Waktu (UTC+0)</th><th>Sub ID</th><th>IP</th><th>Negara</th><th>Perangkat & App</th><th>Value ($)</th></tr>
-                </thead>
-                <tbody id="tbl-conv"></tbody>
-            </table>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr><th class="th-time">Waktu</th><th>Sub ID</th><th>IP</th><th>Negara</th><th>Perangkat</th><th>Value ($)</th></tr>
+                    </thead>
+                    <tbody id="tbl-conv"></tbody>
+                </table>
+            </div>
         </section>
 
         <section id="click-sec" class="panel hidden">
-            <h2>⚡ Live Klik</h2>
-            <table>
-                <thead>
-                    <tr><th class="th-time">Waktu (UTC+0)</th><th>Sub ID</th><th>IP</th><th>Negara</th><th>Perangkat & App</th></tr>
-                </thead>
-                <tbody id="tbl-click"></tbody>
-            </table>
+            <h3 style="font-size:15px; margin-bottom: 8px;">⚡ Live Klik</h3>
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr><th class="th-time">Waktu</th><th>Sub ID</th><th>IP</th><th>Negara</th><th>Perangkat</th></tr>
+                    </thead>
+                    <tbody id="tbl-click"></tbody>
+                </table>
+            </div>
         </section>
 
     </div>
 
     <script>
-        document.addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-        });
-
-        document.addEventListener('keydown', function(e) {
-            if (e.key === 'F12') {
-                e.preventDefault();
-            }
-            if (e.ctrlKey && e.shiftKey && (e.key === 'I' || e.key === 'i' || e.key === 'J' || e.key === 'j' || e.key === 'C' || e.key === 'c')) {
-                e.preventDefault();
-            }
-            if (e.ctrlKey && (e.key === 'U' || e.key === 'u')) {
+        document.addEventListener('contextmenu', e => e.preventDefault());
+        document.addEventListener('keydown', e => {
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase())) || (e.ctrlKey && e.key.toUpperCase() === 'U')) {
                 e.preventDefault();
             }
         });
@@ -622,9 +613,7 @@ app.get('/', (req, res) => {
                     allConversions = data.conversionsHistory || [];
                     renderAnalytics();
                 }
-            } catch (err) {
-                console.error("Gagal memuat data awal:", err);
-            }
+            } catch (err) {}
         }
 
         function generateLink() {
@@ -659,19 +648,14 @@ app.get('/', (req, res) => {
         }
 
         function updateThemeIcon(theme) {
-            const icon = document.getElementById('themeIcon');
-            if (theme === 'dark') {
-                icon.className = 'fa-solid fa-sun';
-            } else {
-                icon.className = 'fa-solid fa-moon';
-            }
+            document.getElementById('themeIcon').className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
         }
 
         let selectedTimezoneOffset = 0;
 
         function onTimezoneChange() {
             selectedTimezoneOffset = parseInt(document.getElementById('tzSelect').value);
-            const label = selectedTimezoneOffset === 7 ? 'Waktu (UTC+7 / WIB)' : 'Waktu (UTC+0)';
+            const label = selectedTimezoneOffset === 7 ? 'Waktu (WIB)' : 'Waktu (UTC)';
             document.querySelectorAll('.th-time').forEach(el => el.innerText = label);
             updateClock();
             renderAnalytics();
@@ -688,13 +672,12 @@ app.get('/', (req, res) => {
             const minutes = String(targetTime.getUTCMinutes()).padStart(2, '0');
             const seconds = String(targetTime.getUTCSeconds()).padStart(2, '0');
 
-            const tzLabel = offsetHours === 7 ? 'WIB' : 'UTC';
-            return \`\${year}-\${month}-\${day} \${hours}:\${minutes}:\${seconds} \${tzLabel}\`;
+            return \`\${year}-\${month}-\${day} \${hours}:\${minutes}:\${seconds}\`;
         }
 
         function updateClock() {
             const nowIso = new Date().toISOString();
-            document.getElementById('liveClock').innerText = formatDateTimeByOffset(nowIso, selectedTimezoneOffset);
+            document.getElementById('liveClock').innerText = formatDateTimeByOffset(nowIso, selectedTimezoneOffset).split(' ')[1];
         }
 
         setInterval(updateClock, 1000);
@@ -771,21 +754,13 @@ app.get('/', (req, res) => {
         };
 
         function switchView(viewType) {
-            const subidSec = document.getElementById('subid-sec');
-            const convSec = document.getElementById('conv-sec');
-            const clickSec = document.getElementById('click-sec');
+            document.getElementById('subid-sec').classList.add('hidden');
+            document.getElementById('conv-sec').classList.add('hidden');
+            document.getElementById('click-sec').classList.add('hidden');
 
-            subidSec.classList.add('hidden');
-            convSec.classList.add('hidden');
-            clickSec.classList.add('hidden');
-
-            if (viewType === 'subid') {
-                subidSec.classList.remove('hidden');
-            } else if (viewType === 'click') {
-                clickSec.classList.remove('hidden');
-            } else {
-                convSec.classList.remove('hidden');
-            }
+            if (viewType === 'subid') document.getElementById('subid-sec').classList.remove('hidden');
+            else if (viewType === 'click') document.getElementById('click-sec').classList.remove('hidden');
+            else document.getElementById('conv-sec').classList.remove('hidden');
 
             menu.classList.remove('show');
         }
@@ -793,16 +768,16 @@ app.get('/', (req, res) => {
         const socket = io();
 
         socket.on('force-logout-all', () => {
-            alert('🔒 Akses Anda telah dikeluarkan oleh Admin!');
+            alert('🔒 Akses Anda telah dikeluarkan!');
             logoutCurrentSession();
         });
 
-        socket.on('new-click', (data) => {
+        socket.on('new-click', data => {
             allClicks.unshift(data);
             renderAnalytics();
         });
 
-        socket.on('new-conversion', (data) => {
+        socket.on('new-conversion', data => {
             allConversions.unshift(data);
             renderAnalytics();
         });
@@ -849,9 +824,8 @@ app.get('/', (req, res) => {
                         <td><span class="flag-icon">\${c.flag || '🌐'}</span> \${c.country}</td>
                         <td>
                             <div class="device-badge">
-                                <i class="fa-brands \${dev.osIcon}"></i> \${dev.osName}
-                                <span>•</span>
-                                <i class="fa-brands \${dev.browserIcon}"></i> \${dev.browserName}
+                                <i class="fa-brands \${dev.osIcon}"></i>
+                                <i class="fa-brands \${dev.browserIcon}"></i>
                             </div>
                         </td>
                         <td><strong style="color:#10b981">\${c.amount}</strong></td>
@@ -877,9 +851,8 @@ app.get('/', (req, res) => {
                         <td><span class="flag-icon">\${c.flag || '🌐'}</span> \${c.country}</td>
                         <td>
                             <div class="device-badge">
-                                <i class="fa-brands \${dev.osIcon}"></i> \${dev.osName}
-                                <span>•</span>
-                                <i class="fa-brands \${dev.browserIcon}"></i> \${dev.browserName}
+                                <i class="fa-brands \${dev.osIcon}"></i>
+                                <i class="fa-brands \${dev.browserIcon}"></i>
                             </div>
                         </td>
                     \`;
@@ -889,10 +862,9 @@ app.get('/', (req, res) => {
 
             const subIdStats = {};
             const globalUniques = new Set();
-            let totalHits = 0, totalClicks = 0, totalConversions = 0, totalRevenue = 0;
+            let totalClicks = 0, totalConversions = 0, totalRevenue = 0;
 
             filteredClicks.forEach(c => {
-                totalHits++;
                 totalClicks++;
                 globalUniques.add(c.visitorKey);
 
@@ -915,12 +887,11 @@ app.get('/', (req, res) => {
                 subIdStats[c.sub_id].revenue += c.amountVal;
             });
 
-            document.getElementById('total-overall-hits').innerText = totalHits;
-            document.getElementById('total-overall-clicks').innerText = totalClicks;
-            document.getElementById('total-overall-uniques').innerText = globalUniques.size;
-            document.getElementById('total-overall-conversions').innerText = totalConversions;
-            document.getElementById('total-overall-cr').innerText = (globalUniques.size > 0 ? ((totalConversions / globalUniques.size) * 100).toFixed(2) : '0.00') + '%';
-            document.getElementById('total-overall-revenue').innerText = '$' + totalRevenue.toFixed(2);
+            // UPDATE CARD STATS MOBILE
+            document.getElementById('card-clicks').innerText = totalClicks;
+            document.getElementById('card-uniques').innerText = globalUniques.size;
+            document.getElementById('card-conversions').innerText = totalConversions;
+            document.getElementById('card-revenue').innerText = '$' + totalRevenue.toFixed(2);
 
             const tbodySubId = document.getElementById('tbl-subid-body');
             tbodySubId.innerHTML = '';
@@ -928,7 +899,7 @@ app.get('/', (req, res) => {
             let subIdKeys = Object.keys(subIdStats).filter(key => key.toLowerCase().includes(subIdSearch));
 
             if (subIdKeys.length === 0) {
-                tbodySubId.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #94a3b8;">Tidak ada data Sub ID yang ditemukan.</td></tr>';
+                tbodySubId.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #94a3b8;">Tidak ada data Sub ID.</td></tr>';
                 return;
             }
 
@@ -970,7 +941,7 @@ app.get('/', (req, res) => {
         }
 
         function triggerForceLogout() {
-            if (confirm("Apakah Anda yakin ingin mengeluarkan seluruh sesi pengguna yang aktif?")) {
+            if (confirm("Keluarkan seluruh sesi pengguna aktif?")) {
                 fetch('/api/force-logout', { method: 'POST' });
             }
         }
