@@ -19,8 +19,8 @@ const IMONETIZEIT_BASE_URL = 'https://kebkzw.dlstinguishedate.net/?utm_source=da
 const MONGODB_URI = 'mongodb+srv://idamanmu221_db_user:qbOqeivECV03o5ci@cluster0.oqtct5v.mongodb.net/?appName=Cluster0';
 
 const PASSWORDS = {
-    admin: 'admin123',
-    guest: 'user123'
+    admin: 'sembuarang',
+    guest: 'nguelidd'
 };
 
 // CONNECT TO MONGODB ATLAS
