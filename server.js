@@ -3,6 +3,8 @@ const http = require('http');
 const { Server } = require('socket.io');
 const useragent = require('express-useragent');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
@@ -19,9 +21,44 @@ const PASSWORDS = {
     guest: 'user123'
 };
 
-// Analytics In-Memory Store
+// PERSISTENT DATABASE LOGIC (database.json)
+const DB_FILE = path.join(__dirname, 'database.json');
+
 let clicksHistory = [];
 let conversionsHistory = [];
+
+// Fungsi membaca data dari database.json saat server pertama kali dinyalakan
+function loadDatabase() {
+    try {
+        if (fs.existsSync(DB_FILE)) {
+            const rawData = fs.readFileSync(DB_FILE, 'utf8');
+            const parsed = JSON.parse(rawData);
+            clicksHistory = parsed.clicksHistory || [];
+            conversionsHistory = parsed.conversionsHistory || [];
+            console.log(`[DB] Berhasil memuat ${clicksHistory.length} data klik & ${conversionsHistory.length} data konversi.`);
+        } else {
+            saveDatabase(); // Buat file jika belum ada
+        }
+    } catch (err) {
+        console.error('[DB] Gagal memuat database.json:', err.message);
+    }
+}
+
+// Fungsi menyimpan data ke database.json secara otomatis
+function saveDatabase() {
+    try {
+        const dataToSave = {
+            clicksHistory: clicksHistory,
+            conversionsHistory: conversionsHistory
+        };
+        fs.writeFileSync(DB_FILE, JSON.stringify(dataToSave, null, 2), 'utf8');
+    } catch (err) {
+        console.error('[DB] Gagal menyimpan ke database.json:', err.message);
+    }
+}
+
+// Jalankan fungsi loadDatabase
+loadDatabase();
 
 function getFlagEmoji(countryCode) {
     if (!countryCode || countryCode === 'XX' || countryCode === 'LOCAL') return '🌐';
@@ -99,6 +136,7 @@ app.get('/click', async (req, res) => {
     };
 
     clicksHistory.unshift(clickObj);
+    saveDatabase(); // Simpan ke file database.json
     io.emit('new-click', clickObj);
 
     // Format URL Akhir (Hanya mengisi s3, s5, dan click_id)
@@ -125,6 +163,14 @@ app.post('/api/force-logout', (req, res) => {
     res.json({ status: 'ok', message: 'Semua sesi berhasil dikeluarkan.' });
 });
 
+// Endpoint mengambil initial data saat UI dimuat/di-refresh
+app.get('/api/initial-data', (req, res) => {
+    res.json({
+        clicksHistory: clicksHistory,
+        conversionsHistory: conversionsHistory
+    });
+});
+
 app.post('/api/track-click', async (req, res) => {
     const subId = req.body.sub_id || req.query.sub_id || 'sub1';
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -144,6 +190,7 @@ app.post('/api/track-click', async (req, res) => {
     };
 
     clicksHistory.unshift(clickObj);
+    saveDatabase(); // Simpan ke file database.json
     io.emit('new-click', clickObj);
     res.json({ status: 'ok' });
 });
@@ -175,6 +222,7 @@ app.post('/api/track-conversion', async (req, res) => {
     };
 
     conversionsHistory.unshift(convObj);
+    saveDatabase(); // Simpan ke file database.json
     io.emit('new-conversion', convObj);
     res.json({ status: 'ok' });
 });
@@ -542,6 +590,7 @@ app.get('/', (req, res) => {
                 document.getElementById('loginError').style.display = 'none';
                 document.getElementById('passInput').value = '';
                 checkSession();
+                fetchInitialData();
             } else {
                 document.getElementById('loginError').style.display = 'block';
             }
@@ -551,6 +600,20 @@ app.get('/', (req, res) => {
             localStorage.removeItem('user_role');
             userRole = null;
             checkSession();
+        }
+
+        async function fetchInitialData() {
+            try {
+                const res = await fetch('/api/initial-data');
+                if (res.ok) {
+                    const data = await res.json();
+                    allClicks = data.clicksHistory || [];
+                    allConversions = data.conversionsHistory || [];
+                    renderAnalytics();
+                }
+            } catch (err) {
+                console.error("Gagal memuat data awal:", err);
+            }
         }
 
         function generateLink() {
@@ -903,6 +966,7 @@ app.get('/', (req, res) => {
 
         initTheme();
         checkSession();
+        fetchInitialData();
         updateClock();
     </script>
 </body>
