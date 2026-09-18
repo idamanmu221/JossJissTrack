@@ -17,7 +17,7 @@ app.use(express.json());
 const IMONETIZEIT_BASE_URL = 'https://kebkzw.dlstinguishedate.net/?utm_source=da57dc555e50572d&ban=fb&j1=1&s1=205200&s2=2060889';
 
 const PASSWORDS = {
-    admin: 'admin123',
+    admin: 'sembuarang',
     guest: 'akuuser'
 };
 
