@@ -16,7 +16,7 @@ app.use(express.json());
 const IMONETIZEIT_BASE_URL = 'https://kebkzw.dlstinguishedate.net/?utm_source=da57dc555e50572d&ban=fb&j1=1&s1=205200&s2=2060889';
 
 // GANTI DENGAN CONNECTION STRING MONGODB ATLAS ANDA
-const MONGODB_URI = 'mongodb+srv://idamanmu221_db_user:eWoay7EzZ4SYskzI>@cluster0.oqtct5v.mongodb.net/?appName=Cluster0';
+const MONGODB_URI = 'mongodb+srv://idamanmu221_db_user:eWoay7EzZ4SYskzI@cluster0.oqtct5v.mongodb.net/?appName=Cluster0';
 
 const PASSWORDS = {
     admin: 'admin123',
