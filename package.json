@@ -1,0 +1,26 @@
+{
+  "name": "realtime-dashboard",
+  "version": "1.0.0",
+  "description": "Dashboard Pemantauan Klik dan Konversi Realtime",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "keywords": [
+    "realtime",
+    "analytics",
+    "dashboard",
+    "socket.io",
+    "express"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.20.0",
+    "express": "^4.22.3",
+    "express-useragent": "^1.0.15",
+    "socket.io": "^4.8.3"
+  },
+  "type": "commonjs"
+}
