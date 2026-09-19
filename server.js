@@ -259,6 +259,32 @@ app.get('/api/track-conversion', async (req, res) => {
     await processConversion(req, res);
 });
 
+// ENDPOINT HAPUS DATA KONVERSI BERDASARKAN SUB_ID
+app.get('/api/delete-conversion', async (req, res) => {
+    const targetSubId = req.query.sub_id;
+    if (!targetSubId) {
+        return res.status(400).json({ status: 'error', message: 'Masukkan parameter sub_id yang ingin dihapus' });
+    }
+
+    try {
+        await ConversionModel.deleteMany({ sub_id: targetSubId });
+        res.json({ status: 'ok', message: `Data konversi dengan sub_id '${targetSubId}' berhasil dihapus.` });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+// ENDPOINT RESET/HAPUS SELURUH DATA STATISTIK
+app.get('/api/clear-all-data', async (req, res) => {
+    try {
+        await ClickModel.deleteMany({});
+        await ConversionModel.deleteMany({});
+        res.json({ status: 'ok', message: 'Seluruh data klik dan konversi berhasil dibersihkan.' });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
 // Serve Dashboard UI (Mobile Friendly, Filters UTC, Max 100 Live Clicks)
 app.get('/', (req, res) => {
     res.send(`
