@@ -37,7 +37,8 @@ const ClickSchema = new mongoose.Schema({
     country: String,
     flag: String,
     deviceInfo: Object,
-    visitorKey: String
+    visitorKey: String,
+    type: { type: String, default: 'click' } // 'hit' atau 'click'
 });
 
 const ConversionSchema = new mongoose.Schema({
@@ -135,7 +136,7 @@ app.get('/click', async (req, res) => {
     const deviceInfo = getDeviceIcons(req.useragent);
     const now = new Date();
 
-    const clickObj = {
+    const baseObj = {
         id: Date.now() + Math.random(),
         isoDate: now.toISOString(),
         sub_id: subId,
@@ -146,6 +147,11 @@ app.get('/click', async (req, res) => {
         visitorKey: `${geo.ip}_${req.useragent.source}`
     };
 
+    // 1. Catat Hit (Page View)
+    await ClickModel.create({ ...baseObj, type: 'hit' });
+
+    // 2. Catat Click (Redirect Sukses)
+    const clickObj = { ...baseObj, type: 'click' };
     await ClickModel.create(clickObj);
     io.emit('new-click', clickObj);
 
@@ -189,7 +195,7 @@ app.post('/api/track-click', async (req, res) => {
     const deviceInfo = getDeviceIcons(req.useragent);
     const now = new Date();
 
-    const clickObj = {
+    const baseObj = {
         id: Date.now() + Math.random(),
         isoDate: now.toISOString(),
         sub_id: subId,
@@ -200,6 +206,8 @@ app.post('/api/track-click', async (req, res) => {
         visitorKey: `${geo.ip}_${req.useragent.source}`
     };
 
+    await ClickModel.create({ ...baseObj, type: 'hit' });
+    const clickObj = { ...baseObj, type: 'click' };
     await ClickModel.create(clickObj);
     io.emit('new-click', clickObj);
     res.json({ status: 'ok' });
@@ -236,7 +244,7 @@ app.post('/api/track-conversion', async (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// Serve Dashboard UI (Filter Preset UTC Based)
+// Serve Dashboard UI
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -374,7 +382,6 @@ app.get('/', (req, res) => {
             cursor: pointer; font-size: 12px; font-weight: bold; color: var(--text-color); flex: 1; text-align: center;
         }
 
-        /* CARD STATS MODERNE FOR MOBILE */
         .summary-grid {
             display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;
         }
@@ -387,7 +394,6 @@ app.get('/', (req, res) => {
         .stat-card .label { font-size: 11px; color: #64748b; font-weight: bold; text-transform: uppercase; }
         .stat-card .value { font-size: 16px; font-weight: 800; margin-top: 4px; }
 
-        /* SCROLLABLE TABLE CONTAINERS FOR MOBILE */
         .table-responsive {
             width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 5px;
         }
@@ -483,7 +489,6 @@ app.get('/', (req, res) => {
             <button class="btn-preset" onclick="resetDateFilter()">Reset</button>
         </div>
 
-        <!-- MOBILE SUMMARY STATS CARDS -->
         <div class="summary-grid">
             <div class="stat-card">
                 <div class="label">Total Clicks</div>
@@ -712,16 +717,13 @@ app.get('/', (req, res) => {
             }
         });
 
-        // PRESET FILTER TANGGAL BERDASARKAN UTC PERIODE
         function setPreset(preset) {
             const now = new Date();
             let start = new Date();
             let end = new Date();
             
             if (preset === 'today') {
-                // Awal hari jam 00:00:00 UTC
                 start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-                // Akhir hari jam 23:59:59 UTC
                 end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
             } else if (preset === 'week') {
                 const day = now.getUTCDay() || 7;
@@ -845,11 +847,13 @@ app.get('/', (req, res) => {
                 });
             }
 
-            // TAB LIVE CLICK (PEMBATASAN 100 KLIK TERBARU)
+            // TAB LIVE CLICK (PEMBATASAN MAX 100 TAMPILAN)
             const tbodyClick = document.getElementById('tbl-click');
             tbodyClick.innerHTML = '';
             
-            const limitedClicksForDisplay = filteredClicks.slice(0, 100);
+            // Filter hanya record yang bertipe 'click' untuk tabel Live Click
+            const clickOnlyList = filteredClicks.filter(c => c.type !== 'hit');
+            const limitedClicksForDisplay = clickOnlyList.slice(0, 100);
 
             if (limitedClicksForDisplay.length === 0) {
                 tbodyClick.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data klik.</td></tr>';
@@ -875,21 +879,24 @@ app.get('/', (req, res) => {
                 });
             }
 
-            // HITUNG STATISTIK KESELURUHAN (MENGGUNAKAN SELURUH DATA FILTERED CLICKS)
+            // HITUNG STATISTIK KESELURUHAN (HITS, CLICKS, UNIQUES, CONVERSIONS)
             const subIdStats = {};
             const globalUniques = new Set();
             let totalClicks = 0, totalConversions = 0, totalRevenue = 0;
 
             filteredClicks.forEach(c => {
-                totalClicks++;
-                globalUniques.add(c.visitorKey);
-
                 if (!subIdStats[c.sub_id]) {
                     subIdStats[c.sub_id] = { hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set() };
                 }
-                subIdStats[c.sub_id].hits++;
-                subIdStats[c.sub_id].clicks++;
-                subIdStats[c.sub_id].uniques.add(c.visitorKey);
+
+                if (c.type === 'hit') {
+                    subIdStats[c.sub_id].hits++;
+                } else {
+                    totalClicks++;
+                    globalUniques.add(c.visitorKey);
+                    subIdStats[c.sub_id].clicks++;
+                    subIdStats[c.sub_id].uniques.add(c.visitorKey);
+                }
             });
 
             filteredConversions.forEach(c => {
