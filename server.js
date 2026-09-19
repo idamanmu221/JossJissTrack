@@ -11,6 +11,7 @@ const io = new Server(server);
 
 app.use(useragent.express());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // CONFIGURATION
 const IMONETIZEIT_BASE_URL = 'https://kebkzw.dlstinguishedate.net/?utm_source=da57dc555e50572d&ban=fb&j1=1&s1=205200&s2=2060889';
@@ -147,10 +148,10 @@ app.get('/click', async (req, res) => {
         visitorKey: `${geo.ip}_${req.useragent.source}`
     };
 
-    // 1. Catat Hit (Page View)
+    // 1. Catat Hit (Page View / Access Attempt)
     await ClickModel.create({ ...baseObj, type: 'hit' });
 
-    // 2. Catat Click (Redirect Sukses)
+    // 2. Catat Click (Redirect Sukses ke Offer)
     const clickObj = { ...baseObj, type: 'click' };
     await ClickModel.create(clickObj);
     io.emit('new-click', clickObj);
@@ -213,12 +214,16 @@ app.post('/api/track-click', async (req, res) => {
     res.json({ status: 'ok' });
 });
 
-app.post('/api/track-conversion', async (req, res) => {
-    const subId = req.body.sub_id || req.query.sub_id || 'sub1';
-    let amountVal = parseFloat(req.body.amount || req.query.amount);
-    
+// FUNGSI FLEKSIBEL PROSES KONVERSI POSTBACK (MENDUKUNG GET & POST + VARIASI NAMA PARAMETER)
+async function processConversion(req, res) {
+    const subId = req.query.sub_id || req.body.sub_id || 
+                  req.query.click_id || req.body.click_id || 
+                  req.query.token_1 || req.body.token_1 || 
+                  req.query.s3 || req.body.s3 || 'sub1';
+
+    let amountVal = parseFloat(req.query.amount || req.body.amount || req.query.payout || req.body.payout);
     if (isNaN(amountVal)) {
-        amountVal = parseFloat((Math.random() * 90 + 10).toFixed(2));
+        amountVal = 1.00;
     }
 
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
@@ -241,10 +246,20 @@ app.post('/api/track-conversion', async (req, res) => {
 
     await ConversionModel.create(convObj);
     io.emit('new-conversion', convObj);
-    res.json({ status: 'ok' });
+    console.log(`[CONVERSION SUCCESS] SubID: ${subId} | Amount: $${amountVal}`);
+
+    return res.json({ status: 'ok', sub_id: subId, amount: amountVal });
+}
+
+app.post('/api/track-conversion', async (req, res) => {
+    await processConversion(req, res);
 });
 
-// Serve Dashboard UI
+app.get('/api/track-conversion', async (req, res) => {
+    await processConversion(req, res);
+});
+
+// Serve Dashboard UI (Mobile Friendly, Filters UTC, Max 100 Live Clicks)
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -847,11 +862,10 @@ app.get('/', (req, res) => {
                 });
             }
 
-            // TAB LIVE CLICK (PEMBATASAN MAX 100 TAMPILAN)
+            // TAB LIVE CLICK (MAX 100 CLICK DATA)
             const tbodyClick = document.getElementById('tbl-click');
             tbodyClick.innerHTML = '';
             
-            // Filter hanya record yang bertipe 'click' untuk tabel Live Click
             const clickOnlyList = filteredClicks.filter(c => c.type !== 'hit');
             const limitedClicksForDisplay = clickOnlyList.slice(0, 100);
 
@@ -879,7 +893,7 @@ app.get('/', (req, res) => {
                 });
             }
 
-            // HITUNG STATISTIK KESELURUHAN (HITS, CLICKS, UNIQUES, CONVERSIONS)
+            // HITUNG STATISTIK KESELURUHAN
             const subIdStats = {};
             const globalUniques = new Set();
             let totalClicks = 0, totalConversions = 0, totalRevenue = 0;
