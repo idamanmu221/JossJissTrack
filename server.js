@@ -534,6 +534,9 @@ app.get('/', (req, res) => {
             padding: 6px 10px; background: var(--panel-bg); border: 1px solid var(--border-color); border-radius: 5px;
             cursor: pointer; font-size: 12px; font-weight: bold; color: var(--text-color); flex: 1; text-align: center;
         }
+        .btn-preset.active {
+            background: #3b82f6 !important; color: white !important; border-color: #3b82f6 !important;
+        }
 
         .summary-grid {
             display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px;
@@ -636,10 +639,11 @@ app.get('/', (req, res) => {
         <div class="filter-bar">
             <input type="text" id="startDatePicker" placeholder="Dari Tanggal (UTC)">
             <input type="text" id="endDatePicker" placeholder="Sampai Tanggal (UTC)">
-            <button class="btn-preset" onclick="setPreset('today')" style="background:#3b82f6; color:white;">Hari Ini (UTC)</button>
-            <button class="btn-preset" onclick="setPreset('week')">Minggu Ini (UTC)</button>
-            <button class="btn-preset" onclick="setPreset('month')">Bulan Ini (UTC)</button>
-            <button class="btn-preset" onclick="resetDateFilter()">Reset</button>
+            <button id="btn-today" class="btn-preset active" onclick="setPreset('today')">Hari Ini (UTC)</button>
+            <button id="btn-yesterday" class="btn-preset" onclick="setPreset('yesterday')">Kemarin (UTC)</button>
+            <button id="btn-week" class="btn-preset" onclick="setPreset('week')">Minggu Ini (UTC)</button>
+            <button id="btn-month" class="btn-preset" onclick="setPreset('month')">Bulan Ini (UTC)</button>
+            <button class="btn-preset" onclick="resetDateFilter()">Reset (Semua)</button>
         </div>
 
         <div class="summary-grid">
@@ -772,7 +776,9 @@ app.get('/', (req, res) => {
                     const data = await res.json();
                     allClicks = data.clicksHistory || [];
                     allConversions = data.conversionsHistory || [];
-                    renderAnalytics();
+                    
+                    // OTOMATIS AKTIFKAN FILTER DEFAULT "HARI INI" SAAT DATA PERTAMA DI-LOAD
+                    setPreset('today');
                 }
             } catch (err) {}
         }
@@ -853,6 +859,7 @@ app.get('/', (req, res) => {
             dateFormat: "Y-m-d",
             onChange: function(selectedDates) {
                 filterStartDate = selectedDates[0] ? selectedDates[0] : null;
+                clearActiveButtons();
                 renderAnalytics();
             }
         });
@@ -866,23 +873,39 @@ app.get('/', (req, res) => {
                 } else {
                     filterEndDate = null;
                 }
+                clearActiveButtons();
                 renderAnalytics();
             }
         });
 
+        function clearActiveButtons() {
+            document.getElementById('btn-today').classList.remove('active');
+            document.getElementById('btn-yesterday').classList.remove('active');
+            document.getElementById('btn-week').classList.remove('active');
+            document.getElementById('btn-month').classList.remove('active');
+        }
+
         function setPreset(preset) {
+            clearActiveButtons();
             const now = new Date();
             let start = new Date();
             let end = new Date();
             
             if (preset === 'today') {
+                document.getElementById('btn-today').classList.add('active');
                 start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
                 end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
+            } else if (preset === 'yesterday') {
+                document.getElementById('btn-yesterday').classList.add('active');
+                start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1, 0, 0, 0, 0));
+                end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1, 23, 59, 59, 999));
             } else if (preset === 'week') {
+                document.getElementById('btn-week').classList.add('active');
                 const day = now.getUTCDay() || 7;
                 start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day + 1, 0, 0, 0, 0));
                 end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
             } else if (preset === 'month') {
+                document.getElementById('btn-month').classList.add('active');
                 start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0));
                 end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
             }
@@ -897,6 +920,7 @@ app.get('/', (req, res) => {
         }
 
         function resetDateFilter() {
+            clearActiveButtons();
             fpStart.clear();
             fpEnd.clear();
             filterStartDate = null;
