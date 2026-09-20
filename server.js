@@ -58,6 +58,35 @@ const ConversionSchema = new mongoose.Schema({
 const ClickModel = mongoose.model('Click', ClickSchema);
 const ConversionModel = mongoose.model('Conversion', ConversionSchema);
 
+// KAMUS PEMETAAN NAMA NEGARA LENGKAP KE KODE ISO 2-LETTER
+const COUNTRY_MAP = {
+    'AFGHANISTAN': 'AF', 'ALBANIA': 'AL', 'ALGERIA': 'DZ', 'ARGENTINA': 'AR', 'ARMENIA': 'AM',
+    'AUSTRALIA': 'AU', 'AUSTRIA': 'AT', 'AZERBAIJAN': 'AZ', 'BAHRAIN': 'BH', 'BANGLADESH': 'BD',
+    'BELARUS': 'BY', 'BELGIUM': 'BE', 'BOLIVIA': 'BO', 'BOSNIA AND HERZEGOVINA': 'BA', 'BRAZIL': 'BR',
+    'BULGARIA': 'BG', 'CAMBODIA': 'KH', 'CANADA': 'CA', 'CHILE': 'CL', 'CHINA': 'CN', 'COLOMBIA': 'CO',
+    'COSTA RICA': 'CR', 'CROATIA': 'HR', 'CYPRUS': 'CY', 'CZECH REPUBLIC': 'CZ', 'CZECHIA': 'CZ',
+    'DENMARK': 'DK', 'DOMINICAN REPUBLIC': 'DO', 'ECUADOR': 'EC', 'EGYPT': 'EG', 'EL SALVADOR': 'SV',
+    'ESTONIA': 'EE', 'FINLAND': 'FI', 'FRANCE': 'FR', 'GEORGIA': 'GE', 'GERMANY': 'DE', 'GREECE': 'GR',
+    'GUATEMALA': 'GT', 'HONDURAS': 'HN', 'HONG KONG': 'HK', 'HUNGARY': 'HU', 'ICELAND': 'IS',
+    'INDIA': 'IN', 'INDONESIA': 'ID', 'IRAQ': 'IQ', 'IRELAND': 'IE', 'ISRAEL': 'IL', 'ITALY': 'IT',
+    'JAMAICA': 'JM', 'JAPAN': 'JP', 'JORDAN': 'JO', 'KAZAKHSTAN': 'KZ', 'KENYA': 'KE', 'KOREA': 'KR',
+    'SOUTH KOREA': 'KR', 'KUWAIT': 'KW', 'LATVIA': 'LV', 'LEBANON': 'LB', 'LITHUANIA': 'LT',
+    'LUXEMBOURG': 'LU', 'MALAYSIA': 'MY', 'MEXICO': 'MX', 'MOLDOVA': 'MD', 'MONTENEGRO': 'ME',
+    'MOROCCO': 'MA', 'NETHERLANDS': 'NL', 'NEW ZEALAND': 'NZ', 'NICARAGUA': 'NI', 'NIGERIA': 'NG',
+    'NORTH MACEDONIA': 'MK', 'NORWAY': 'NO', 'OMAN': 'OM', 'PAKISTAN': 'PK', 'PANAMA': 'PA',
+    'PARAGUAY': 'PY', 'PERU': 'PE', 'PHILIPPINES': 'PH', 'POLAND': 'PL', 'PORTUGAL': 'PT',
+    'QATAR': 'QA', 'ROMANIA': 'RO', 'RUSSIA': 'RU', 'SAUDI ARABIA': 'SA', 'SERBIA': 'RS',
+    'SINGAPORE': 'SG', 'SLOVAKIA': 'SK', 'SLOVENIA': 'SI', 'SOUTH AFRICA': 'ZA', 'SPAIN': 'ES',
+    'SRI LANKA': 'LK', 'SWEDEN': 'SE', 'SWITZERLAND': 'CH', 'TAIWAN': 'TW', 'THAILAND': 'TH',
+    'TUNISIA': 'TN', 'TURKEY': 'TR', 'TÜRKIYE': 'TR', 'UKRAINE': 'UA', 'UNITED ARAB EMIRATES': 'AE',
+    'UNITED KINGDOM': 'GB', 'UNITED STATES': 'US', 'URUGUAY': 'UY', 'UZBEKISTAN': 'UZ',
+    'VENEZUELA': 'VE', 'VIETNAM': 'VN'
+};
+
+function toTitleCase(str) {
+    return str.toLowerCase().split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
 function getFlagEmoji(countryCode) {
     if (!countryCode || countryCode === 'XX' || countryCode === 'LOCAL') return '🌐';
     const codePoints = countryCode
@@ -214,7 +243,7 @@ app.post('/api/track-click', async (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// FUNGSI PROSES KONVERSI POSTBACK DENGAN TANGKAPAN NEGARA DARI IMONETIZEIT
+// FUNGSI PROSES KONVERSI POSTBACK DENGAN PEMETAAN NAMA NEGARA LENGKAP & KODE ISO
 async function processConversion(req, res) {
     const subId = req.query.sub_id || req.body.sub_id || 
                   req.query.click_id || req.body.click_id || 
@@ -226,17 +255,25 @@ async function processConversion(req, res) {
         amountVal = 1.00;
     }
 
-    // Tangkap parameter negara dari iMonetizeIt (contoh: country=US atau country=ID)
     const rawCountry = req.query.country || req.body.country;
-    
     let countryName = 'Unknown';
     let flagEmoji = '🌐';
     let clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     if (rawCountry && rawCountry.trim() !== '' && rawCountry !== '{country}') {
-        const countryCode = rawCountry.trim().toUpperCase();
-        flagEmoji = getFlagEmoji(countryCode);
-        countryName = countryCode;
+        const cleanedCountry = rawCountry.trim().toUpperCase();
+        
+        if (cleanedCountry.length === 2) {
+            flagEmoji = getFlagEmoji(cleanedCountry);
+            countryName = cleanedCountry;
+        } else if (COUNTRY_MAP[cleanedCountry]) {
+            const isoCode = COUNTRY_MAP[cleanedCountry];
+            flagEmoji = getFlagEmoji(isoCode);
+            countryName = toTitleCase(rawCountry.trim());
+        } else {
+            countryName = toTitleCase(rawCountry.trim());
+            flagEmoji = '🌐';
+        }
     } else {
         const geo = await getGeoLocation(clientIp);
         countryName = geo.country;
@@ -262,7 +299,7 @@ async function processConversion(req, res) {
 
     await ConversionModel.create(convObj);
     io.emit('new-conversion', convObj);
-    console.log(`[CONVERSION SUCCESS] SubID: ${subId} | Amount: $${amountVal} | Country: ${countryName}`);
+    console.log(`[CONVERSION SUCCESS] SubID: ${subId} | Amount: $${amountVal} | Country: ${countryName} (${flagEmoji})`);
 
     return res.json({ status: 'ok', sub_id: subId, amount: amountVal, country: countryName });
 }
