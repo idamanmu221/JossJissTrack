@@ -217,7 +217,7 @@ app.get('/click', async (req, res) => {
 
     const userAgentSource = req.headers['user-agent'] || (req.useragent ? req.useragent.source : '');
 
-    const baseObj = {
+    const clickObj = {
         id: Date.now() + Math.random(),
         isoDate: now.toISOString(),
         sub_id: subId,
@@ -225,12 +225,10 @@ app.get('/click', async (req, res) => {
         country: geo.country,
         flag: geo.flag,
         deviceInfo: deviceInfo,
-        visitorKey: `${geo.ip}_${userAgentSource}`
+        visitorKey: `${geo.ip}_${userAgentSource}`,
+        type: 'click'
     };
 
-    await ClickModel.create({ ...baseObj, type: 'hit' });
-
-    const clickObj = { ...baseObj, type: 'click' };
     await ClickModel.create(clickObj);
     io.emit('new-click', clickObj);
 
@@ -276,7 +274,7 @@ app.post('/api/track-click', async (req, res) => {
 
     const userAgentSource = req.headers['user-agent'] || (req.useragent ? req.useragent.source : '');
 
-    const baseObj = {
+    const clickObj = {
         id: Date.now() + Math.random(),
         isoDate: now.toISOString(),
         sub_id: subId,
@@ -284,11 +282,10 @@ app.post('/api/track-click', async (req, res) => {
         country: geo.country,
         flag: geo.flag,
         deviceInfo: deviceInfo,
-        visitorKey: `${geo.ip}_${userAgentSource}`
+        visitorKey: `${geo.ip}_${userAgentSource}`,
+        type: 'click'
     };
 
-    await ClickModel.create({ ...baseObj, type: 'hit' });
-    const clickObj = { ...baseObj, type: 'click' };
     await ClickModel.create(clickObj);
     io.emit('new-click', clickObj);
     res.json({ status: 'ok' });
@@ -688,7 +685,6 @@ app.get('/', (req, res) => {
                     <thead>
                         <tr>
                             <th>Sub ID</th>
-                            <th>Hits</th>
                             <th>Clicks</th>
                             <th>Uniques</th>
                             <th>Conversions</th>
@@ -967,7 +963,7 @@ app.get('/', (req, res) => {
                 filterBar.classList.remove('hidden');
             } else if (viewType === 'click') {
                 document.getElementById('click-sec').classList.remove('hidden');
-                filterBar.classList.add('hidden'); // SEMBUNYIKAN FILTER UNTUK LIVE CLICK
+                filterBar.classList.add('hidden');
             } else {
                 document.getElementById('conv-sec').classList.remove('hidden');
                 filterBar.classList.remove('hidden');
@@ -1006,7 +1002,6 @@ app.get('/', (req, res) => {
             const subIdSearch = document.getElementById('searchSubId').value.toLowerCase();
             const convSearch = document.getElementById('searchConv').value.toLowerCase();
 
-            // DATA KLIK DAN KONVERSI TERFILTER (UNTUK DASHBOARD, SUB ID, DAN CONVERSION)
             const filteredClicks = allClicks.filter(c => {
                 const dt = new Date(c.isoDate);
                 if (filterStartDate && dt < filterStartDate) return false;
@@ -1021,7 +1016,6 @@ app.get('/', (req, res) => {
                 return true;
             });
 
-            // HITUNG STATISTIK KESELURUHAN & BANYAKNYA REVENUE PER SUB ID
             const subIdStats = {};
             const globalUniques = new Set();
             let totalClicks = 0, totalConversions = 0, totalRevenue = 0;
@@ -1032,26 +1026,21 @@ app.get('/', (req, res) => {
                 const flag = c.flag || '🌐';
 
                 if (!subIdStats[sId]) {
-                    subIdStats[sId] = { hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set(), countries: {} };
+                    subIdStats[sId] = { clicks: 0, conversions: 0, revenue: 0, uniques: new Set(), countries: {} };
                 }
 
                 if (!subIdStats[sId].countries[country]) {
-                    subIdStats[sId].countries[country] = { flag: flag, hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set() };
+                    subIdStats[sId].countries[country] = { flag: flag, clicks: 0, conversions: 0, revenue: 0, uniques: new Set() };
                 }
 
-                if (c.type === 'hit') {
-                    subIdStats[sId].hits++;
-                    subIdStats[sId].countries[country].hits++;
-                } else {
-                    totalClicks++;
-                    globalUniques.add(c.visitorKey);
+                totalClicks++;
+                globalUniques.add(c.visitorKey);
 
-                    subIdStats[sId].clicks++;
-                    subIdStats[sId].uniques.add(c.visitorKey);
+                subIdStats[sId].clicks++;
+                subIdStats[sId].uniques.add(c.visitorKey);
 
-                    subIdStats[sId].countries[country].clicks++;
-                    subIdStats[sId].countries[country].uniques.add(c.visitorKey);
-                }
+                subIdStats[sId].countries[country].clicks++;
+                subIdStats[sId].countries[country].uniques.add(c.visitorKey);
             });
 
             filteredConversions.forEach(c => {
@@ -1063,11 +1052,11 @@ app.get('/', (req, res) => {
                 totalRevenue += c.amountVal;
 
                 if (!subIdStats[sId]) {
-                    subIdStats[sId] = { hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set(), countries: {} };
+                    subIdStats[sId] = { clicks: 0, conversions: 0, revenue: 0, uniques: new Set(), countries: {} };
                 }
 
                 if (!subIdStats[sId].countries[country]) {
-                    subIdStats[sId].countries[country] = { flag: flag, hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set() };
+                    subIdStats[sId].countries[country] = { flag: flag, clicks: 0, conversions: 0, revenue: 0, uniques: new Set() };
                 }
 
                 subIdStats[sId].conversions++;
@@ -1077,7 +1066,7 @@ app.get('/', (req, res) => {
                 subIdStats[sId].countries[country].revenue += c.amountVal;
             });
 
-            // CARI SUB ID DENGAN REVENUE HIGHEST (PEMENANG MAHKOTA)
+            // SUB ID DENGAN REVENUE HIGHEST (PEMENANG MAHKOTA)
             let topSubId = null;
             let maxRevenue = 0;
             Object.keys(subIdStats).forEach(sId => {
@@ -1093,7 +1082,7 @@ app.get('/', (req, res) => {
             document.getElementById('card-conversions').innerText = totalConversions;
             document.getElementById('card-revenue').innerText = '$' + totalRevenue.toFixed(2);
 
-            // RENDER TAB CONVERSION
+            // RENDER TAB CONVERSION (ADA MAHKOTA DI SUB ID PEMENANG REVENUE TERBESAR)
             const tbodyConv = document.getElementById('tbl-conv');
             tbodyConv.innerHTML = '';
             
@@ -1130,12 +1119,11 @@ app.get('/', (req, res) => {
                 });
             }
 
-            // RENDER TAB LIVE CLICK (SELALU MENGAMBIL 100 KLIK TERBARU TANPA TERPENGARUH FILTER)
+            // RENDER TAB LIVE CLICK (100 KLIK TERBARU TANPA FILTER DENGAN TAMPILAN POLOS)
             const tbodyClick = document.getElementById('tbl-click');
             tbodyClick.innerHTML = '';
             
-            const clickOnlyList = allClicks.filter(c => c.type !== 'hit');
-            const limitedClicksForDisplay = clickOnlyList.slice(0, 100);
+            const limitedClicksForDisplay = allClicks.slice(0, 100);
 
             if (limitedClicksForDisplay.length === 0) {
                 tbodyClick.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data klik.</td></tr>';
@@ -1167,11 +1155,10 @@ app.get('/', (req, res) => {
 
             let subIdKeys = Object.keys(subIdStats).filter(key => key.toLowerCase().includes(subIdSearch));
 
-            // URUTKAN SUB ID BERDASARKAN REVENUE TERBESAR KE TERKECIL
             subIdKeys.sort((a, b) => subIdStats[b].revenue - subIdStats[a].revenue);
 
             if (subIdKeys.length === 0) {
-                tbodySubId.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #94a3b8;">Tidak ada data Sub ID.</td></tr>';
+                tbodySubId.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #94a3b8;">Tidak ada data Sub ID.</td></tr>';
                 return;
             }
 
@@ -1189,11 +1176,9 @@ app.get('/', (req, res) => {
                 tr.innerHTML = \`
                     <td>
                         <span class="badge-subid">
-                            <i class="fa-solid \${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}" style="font-size:9px;"></i>
                             \${isTop ? '👑 ' : ''}\${subId}
                         </span>
                     </td>
-                    <td>\${item.hits}</td>
                     <td>\${item.clicks}</td>
                     <td><strong style="color:#8b5cf6;">\${uCount}</strong></td>
                     <td><strong>\${item.conversions}</strong></td>
@@ -1202,14 +1187,11 @@ app.get('/', (req, res) => {
                 \`;
                 tbodySubId.appendChild(tr);
 
-                // RENDER DETAIL PER NEGARA
                 if (isExpanded) {
                     const detailTr = document.createElement('tr');
                     let countryKeys = Object.keys(item.countries);
 
-                    // URUTKAN NEGARA:
-                    // 1. REVENUE TERBESAR DAHULU
-                    // 2. JIKA REVENUE SAMA (SAMA-SAMA 0), URUTKAN BERDASARKAN KLIK TERBANYAK
+                    // PENGURUTAN DETAIL NEGARA: REVENUE TERBESAR, JIKA 0 URUTKAN DARI KLIK TERBANYAK
                     countryKeys.sort((a, b) => {
                         const revA = item.countries[a].revenue;
                         const revB = item.countries[b].revenue;
@@ -1228,7 +1210,6 @@ app.get('/', (req, res) => {
                         countryRowsHtml += \`
                             <tr>
                                 <td><span class="flag-icon">\${cData.flag}</span> \${cName}</td>
-                                <td>\${cData.hits}</td>
                                 <td>\${cData.clicks}</td>
                                 <td><strong style="color:#8b5cf6;">\${cUniques}</strong></td>
                                 <td><strong>\${cData.conversions}</strong></td>
@@ -1239,7 +1220,7 @@ app.get('/', (req, res) => {
                     });
 
                     detailTr.innerHTML = \`
-                        <td colspan="7" style="padding:0;">
+                        <td colspan="6" style="padding:0;">
                             <div class="country-detail-container">
                                 <div style="font-size:11px; font-weight:bold; color:#38bdf8; margin-bottom:4px;">
                                     🌍 BREAKDOWN NEGARA UNTUK SUB ID: <span style="text-decoration:underline;">\${subId}</span>
@@ -1249,7 +1230,6 @@ app.get('/', (req, res) => {
                                         <thead>
                                             <tr>
                                                 <th>Negara</th>
-                                                <th>Hits</th>
                                                 <th>Clicks</th>
                                                 <th>Uniques</th>
                                                 <th>Conversions</th>
