@@ -423,6 +423,7 @@ app.get('/', (req, res) => {
             --badge-bg: #e0f2fe;
             --badge-text: #0369a1;
             --sub-panel-bg: #f1f5f9;
+            --row-expand-bg: #f8fafc;
         }
 
         [data-theme="dark"] {
@@ -435,6 +436,7 @@ app.get('/', (req, res) => {
             --badge-bg: #1e3a8a;
             --badge-text: #93c5fd;
             --sub-panel-bg: #1e293b;
+            --row-expand-bg: #0f172a;
         }
 
         * { 
@@ -558,12 +560,28 @@ app.get('/', (req, res) => {
         th, td { padding: 10px 8px; border-bottom: 1px solid var(--border-color); font-size: 13px; white-space: nowrap; }
         th { background: var(--table-header); }
         
-        .badge-subid { background: var(--badge-bg); color: var(--badge-text); padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; }
+        tr.clickable-row { cursor: pointer; transition: background 0.15s; }
+        tr.clickable-row:hover { background: var(--sub-panel-bg); }
+
+        .badge-subid { background: var(--badge-bg); color: var(--badge-text); padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
         .flag-icon { font-size: 16px; margin-right: 4px; vertical-align: middle; }
         
         .device-badge {
             display: inline-flex; align-items: center; gap: 4px;
             background: var(--sub-panel-bg); padding: 3px 6px; border-radius: 4px; font-size: 11px; color: var(--text-color);
+        }
+
+        .country-detail-container {
+            background: var(--row-expand-bg); padding: 10px 15px; border-radius: 6px; margin: 4px 0; border: 1px solid var(--border-color);
+        }
+        .country-detail-table {
+            width: 100%; margin-top: 5px; font-size: 12px;
+        }
+        .country-detail-table th {
+            background: var(--sub-panel-bg); font-size: 11px; color: #64748b; padding: 6px 8px;
+        }
+        .country-detail-table td {
+            padding: 6px 8px; border-bottom: 1px dashed var(--border-color);
         }
 
         .hidden { display: none !important; }
@@ -667,7 +685,7 @@ app.get('/', (req, res) => {
         
         <section id="subid-sec" class="panel">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 8px;">
-                <h3 style="font-size:15px;">📊 Performance per Sub ID</h3>
+                <h3 style="font-size:15px;">📊 Performance per Sub ID <span style="font-size:11px; color:#64748b; font-weight:normal;">(Klik baris untuk detail negara)</span></h3>
                 <input type="text" id="searchSubId" placeholder="🔍 Cari..." onkeyup="renderAnalytics()" style="padding: 6px 8px; width: 110px; border: 1px solid var(--border-color); border-radius: 5px; font-size:12px;">
             </div>
             <div class="table-responsive">
@@ -728,6 +746,7 @@ app.get('/', (req, res) => {
         });
 
         let userRole = localStorage.getItem('user_role') || null;
+        let expandedSubIds = new Set(); // MENYIMPAN STATE ACCORDION PER SUB ID
 
         function checkSession() {
             if (userRole === 'admin' || userRole === 'guest') {
@@ -777,7 +796,6 @@ app.get('/', (req, res) => {
                     allClicks = data.clicksHistory || [];
                     allConversions = data.conversionsHistory || [];
                     
-                    // OTOMATIS AKTIFKAN FILTER DEFAULT "HARI INI" SAAT DATA PERTAMA DI-LOAD
                     setPreset('today');
                 }
             } catch (err) {}
@@ -954,6 +972,15 @@ app.get('/', (req, res) => {
             menu.classList.remove('show');
         }
 
+        function toggleSubIdExpand(subId) {
+            if (expandedSubIds.has(subId)) {
+                expandedSubIds.delete(subId);
+            } else {
+                expandedSubIds.add(subId);
+            }
+            renderAnalytics();
+        }
+
         const socket = io();
 
         socket.on('force-logout-all', () => {
@@ -1052,35 +1079,60 @@ app.get('/', (req, res) => {
                 });
             }
 
-            // HITUNG STATISTIK KESELURUHAN
+            // HITUNG STATISTIK KESELURUHAN & PER NEGARA PER SUB ID
             const subIdStats = {};
             const globalUniques = new Set();
             let totalClicks = 0, totalConversions = 0, totalRevenue = 0;
 
             filteredClicks.forEach(c => {
-                if (!subIdStats[c.sub_id]) {
-                    subIdStats[c.sub_id] = { hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set() };
+                const sId = c.sub_id;
+                const country = c.country || 'Unknown';
+                const flag = c.flag || '🌐';
+
+                if (!subIdStats[sId]) {
+                    subIdStats[sId] = { hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set(), countries: {} };
+                }
+
+                if (!subIdStats[sId].countries[country]) {
+                    subIdStats[sId].countries[country] = { flag: flag, hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set() };
                 }
 
                 if (c.type === 'hit') {
-                    subIdStats[c.sub_id].hits++;
+                    subIdStats[sId].hits++;
+                    subIdStats[sId].countries[country].hits++;
                 } else {
                     totalClicks++;
                     globalUniques.add(c.visitorKey);
-                    subIdStats[c.sub_id].clicks++;
-                    subIdStats[c.sub_id].uniques.add(c.visitorKey);
+
+                    subIdStats[sId].clicks++;
+                    subIdStats[sId].uniques.add(c.visitorKey);
+
+                    subIdStats[sId].countries[country].clicks++;
+                    subIdStats[sId].countries[country].uniques.add(c.visitorKey);
                 }
             });
 
             filteredConversions.forEach(c => {
+                const sId = c.sub_id;
+                const country = c.country || 'Unknown';
+                const flag = c.flag || '🌐';
+
                 totalConversions++;
                 totalRevenue += c.amountVal;
 
-                if (!subIdStats[c.sub_id]) {
-                    subIdStats[c.sub_id] = { hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set() };
+                if (!subIdStats[sId]) {
+                    subIdStats[sId] = { hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set(), countries: {} };
                 }
-                subIdStats[c.sub_id].conversions++;
-                subIdStats[c.sub_id].revenue += c.amountVal;
+
+                if (!subIdStats[sId].countries[country]) {
+                    subIdStats[sId].countries[country] = { flag: flag, hits: 0, clicks: 0, conversions: 0, revenue: 0, uniques: new Set() };
+                }
+
+                subIdStats[sId].conversions++;
+                subIdStats[sId].revenue += c.amountVal;
+
+                subIdStats[sId].countries[country].conversions++;
+                subIdStats[sId].countries[country].revenue += c.amountVal;
             });
 
             // UPDATE STATS CARDS
@@ -1094,6 +1146,9 @@ app.get('/', (req, res) => {
 
             let subIdKeys = Object.keys(subIdStats).filter(key => key.toLowerCase().includes(subIdSearch));
 
+            // URUTKAN SUB ID BERDASARKAN REVENUE TERBESAR KE TERKECIL
+            subIdKeys.sort((a, b) => subIdStats[b].revenue - subIdStats[a].revenue);
+
             if (subIdKeys.length === 0) {
                 tbodySubId.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #94a3b8;">Tidak ada data Sub ID.</td></tr>';
                 return;
@@ -1103,10 +1158,19 @@ app.get('/', (req, res) => {
                 const item = subIdStats[subId];
                 const uCount = item.uniques.size;
                 const cr = uCount > 0 ? ((item.conversions / uCount) * 100).toFixed(2) : '0.00';
+                const isExpanded = expandedSubIds.has(subId);
 
                 const tr = document.createElement('tr');
+                tr.className = 'clickable-row';
+                tr.onclick = () => toggleSubIdExpand(subId);
+
                 tr.innerHTML = \`
-                    <td><span class="badge-subid">\${subId}</span></td>
+                    <td>
+                        <span class="badge-subid">
+                            <i class="fa-solid \${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}" style="font-size:9px;"></i>
+                            \${subId}
+                        </span>
+                    </td>
                     <td>\${item.hits}</td>
                     <td>\${item.clicks}</td>
                     <td><strong style="color:#8b5cf6;">\${uCount}</strong></td>
@@ -1115,6 +1179,63 @@ app.get('/', (req, res) => {
                     <td><strong style="color:#10b981;">$\${item.revenue.toFixed(2)}</strong></td>
                 \`;
                 tbodySubId.appendChild(tr);
+
+                // RENDER BARIS EXPAND DETAIL PER NEGARA
+                if (isExpanded) {
+                    const detailTr = document.createElement('tr');
+                    let countryKeys = Object.keys(item.countries);
+
+                    // URUTKAN NEGARA JUGA BERDASARKAN REVENUE TERBESAR
+                    countryKeys.sort((a, b) => item.countries[b].revenue - item.countries[a].revenue);
+
+                    let countryRowsHtml = '';
+                    countryKeys.forEach(cName => {
+                        const cData = item.countries[cName];
+                        const cUniques = cData.uniques.size;
+                        const cCr = cUniques > 0 ? ((cData.conversions / cUniques) * 100).toFixed(2) : '0.00';
+
+                        countryRowsHtml += \`
+                            <tr>
+                                <td><span class="flag-icon">\${cData.flag}</span> \${cName}</td>
+                                <td>\${cData.hits}</td>
+                                <td>\${cData.clicks}</td>
+                                <td><strong style="color:#8b5cf6;">\${cUniques}</strong></td>
+                                <td><strong>\${cData.conversions}</strong></td>
+                                <td><strong style="color:#3b82f6;">\${cCr}%</strong></td>
+                                <td><strong style="color:#10b981;">$\${cData.revenue.toFixed(2)}</strong></td>
+                            </tr>
+                        \`;
+                    });
+
+                    detailTr.innerHTML = \`
+                        <td colspan="7" style="padding:0;">
+                            <div class="country-detail-container">
+                                <div style="font-size:11px; font-weight:bold; color:#38bdf8; margin-bottom:4px;">
+                                    🌍 BREAKDOWN NEGARA UNTUK SUB ID: <span style="text-decoration:underline;">\${subId}</span>
+                                </div>
+                                <div class="table-responsive">
+                                    <table class="country-detail-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Negara</th>
+                                                <th>Hits</th>
+                                                <th>Clicks</th>
+                                                <th>Uniques</th>
+                                                <th>Conversions</th>
+                                                <th>CR (%)</th>
+                                                <th>Revenue ($)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            \${countryRowsHtml}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </td>
+                    \`;
+                    tbodySubId.appendChild(detailTr);
+                }
             });
         }
 
