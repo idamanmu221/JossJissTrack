@@ -214,7 +214,7 @@ app.post('/api/track-click', async (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// FUNGSI FLEKSIBEL PROSES KONVERSI POSTBACK (MENDUKUNG GET & POST + VARIASI NAMA PARAMETER)
+// FUNGSI PROSES KONVERSI POSTBACK DENGAN TANGKAPAN NEGARA DARI IMONETIZEIT
 async function processConversion(req, res) {
     const subId = req.query.sub_id || req.body.sub_id || 
                   req.query.click_id || req.body.click_id || 
@@ -226,8 +226,24 @@ async function processConversion(req, res) {
         amountVal = 1.00;
     }
 
-    const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-    const geo = await getGeoLocation(clientIp);
+    // Tangkap parameter negara dari iMonetizeIt (contoh: country=US atau country=ID)
+    const rawCountry = req.query.country || req.body.country;
+    
+    let countryName = 'Unknown';
+    let flagEmoji = '🌐';
+    let clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+    if (rawCountry && rawCountry.trim() !== '' && rawCountry !== '{country}') {
+        const countryCode = rawCountry.trim().toUpperCase();
+        flagEmoji = getFlagEmoji(countryCode);
+        countryName = countryCode;
+    } else {
+        const geo = await getGeoLocation(clientIp);
+        countryName = geo.country;
+        flagEmoji = geo.flag;
+        clientIp = geo.ip;
+    }
+
     const deviceInfo = getDeviceIcons(req.useragent);
     const now = new Date();
 
@@ -235,20 +251,20 @@ async function processConversion(req, res) {
         id: Date.now() + Math.random(),
         isoDate: now.toISOString(),
         sub_id: subId,
-        ip: geo.ip,
-        country: geo.country,
-        flag: geo.flag,
+        ip: clientIp,
+        country: countryName,
+        flag: flagEmoji,
         deviceInfo: deviceInfo,
         amountVal: amountVal,
         amount: '$' + amountVal.toFixed(2),
-        visitorKey: `${geo.ip}_${req.useragent.source}`
+        visitorKey: `${clientIp}_${req.useragent.source}`
     };
 
     await ConversionModel.create(convObj);
     io.emit('new-conversion', convObj);
-    console.log(`[CONVERSION SUCCESS] SubID: ${subId} | Amount: $${amountVal}`);
+    console.log(`[CONVERSION SUCCESS] SubID: ${subId} | Amount: $${amountVal} | Country: ${countryName}`);
 
-    return res.json({ status: 'ok', sub_id: subId, amount: amountVal });
+    return res.json({ status: 'ok', sub_id: subId, amount: amountVal, country: countryName });
 }
 
 app.post('/api/track-conversion', async (req, res) => {
