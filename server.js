@@ -94,10 +94,8 @@ function getFlagEmoji(countryCode) {
     return String.fromCodePoint(...codePoints);
 }
 
-// PARSER AKURAT OS & BROWSER TERMASUK PERANGKAT MOBILE
 function getDeviceIcons(uaOrReq) {
     let rawUa = '';
-    
     if (uaOrReq && uaOrReq.headers && uaOrReq.headers['user-agent']) {
         rawUa = uaOrReq.headers['user-agent'];
     } else if (uaOrReq && uaOrReq.source) {
@@ -108,7 +106,6 @@ function getDeviceIcons(uaOrReq) {
 
     const uaLower = rawUa.toLowerCase();
 
-    // 1. DETEKSI OS
     let osIcon = 'fa-desktop';
     let osName = 'Desktop';
 
@@ -126,7 +123,6 @@ function getDeviceIcons(uaOrReq) {
         osName = 'Linux';
     }
 
-    // 2. DETEKSI BROWSER
     let browserIcon = 'fa-globe';
     let browserName = 'Browser';
 
@@ -181,7 +177,6 @@ async function getGeoLocation(ip) {
     if (ip && ip.includes(',')) {
         ip = ip.split(',')[0].trim();
     }
-    
     if (ip && ip.startsWith('::ffff:')) {
         ip = ip.replace('::ffff:', '');
     }
@@ -654,7 +649,7 @@ app.get('/', (req, res) => {
 
     <div id="main">
 
-        <div class="filter-bar">
+        <div id="dateFilterBar" class="filter-bar">
             <input type="text" id="startDatePicker" placeholder="Dari Tanggal (UTC)">
             <input type="text" id="endDatePicker" placeholder="Sampai Tanggal (UTC)">
             <button id="btn-today" class="btn-preset active" onclick="setPreset('today')">Hari Ini (UTC)</button>
@@ -746,7 +741,7 @@ app.get('/', (req, res) => {
         });
 
         let userRole = localStorage.getItem('user_role') || null;
-        let expandedSubIds = new Set(); // MENYIMPAN STATE ACCORDION PER SUB ID
+        let expandedSubIds = new Set();
 
         function checkSession() {
             if (userRole === 'admin' || userRole === 'guest') {
@@ -965,9 +960,18 @@ app.get('/', (req, res) => {
             document.getElementById('conv-sec').classList.add('hidden');
             document.getElementById('click-sec').classList.add('hidden');
 
-            if (viewType === 'subid') document.getElementById('subid-sec').classList.remove('hidden');
-            else if (viewType === 'click') document.getElementById('click-sec').classList.remove('hidden');
-            else document.getElementById('conv-sec').classList.remove('hidden');
+            const filterBar = document.getElementById('dateFilterBar');
+
+            if (viewType === 'subid') {
+                document.getElementById('subid-sec').classList.remove('hidden');
+                filterBar.classList.remove('hidden');
+            } else if (viewType === 'click') {
+                document.getElementById('click-sec').classList.remove('hidden');
+                filterBar.classList.add('hidden'); // SEMBUNYIKAN FILTER UNTUK LIVE CLICK
+            } else {
+                document.getElementById('conv-sec').classList.remove('hidden');
+                filterBar.classList.remove('hidden');
+            }
 
             menu.classList.remove('show');
         }
@@ -1002,6 +1006,7 @@ app.get('/', (req, res) => {
             const subIdSearch = document.getElementById('searchSubId').value.toLowerCase();
             const convSearch = document.getElementById('searchConv').value.toLowerCase();
 
+            // DATA KLIK DAN KONVERSI TERFILTER (UNTUK DASHBOARD, SUB ID, DAN CONVERSION)
             const filteredClicks = allClicks.filter(c => {
                 const dt = new Date(c.isoDate);
                 if (filterStartDate && dt < filterStartDate) return false;
@@ -1016,70 +1021,7 @@ app.get('/', (req, res) => {
                 return true;
             });
 
-            // RENDER TAB CONVERSION
-            const tbodyConv = document.getElementById('tbl-conv');
-            tbodyConv.innerHTML = '';
-            
-            const searchedConversions = filteredConversions.filter(c => {
-                return c.sub_id.toLowerCase().includes(convSearch) ||
-                       c.country.toLowerCase().includes(convSearch);
-            });
-
-            if (searchedConversions.length === 0) {
-                tbodyConv.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data konversi.</td></tr>';
-            } else {
-                searchedConversions.forEach(c => {
-                    const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
-                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', osName: 'Desktop' };
-                    
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = \`
-                        <td>\${formattedTime}</td>
-                        <td><span class="badge-subid">\${c.sub_id}</span></td>
-                        <td><span class="flag-icon">\${c.flag || '🌐'}</span> \${c.country}</td>
-                        <td>
-                            <div class="device-badge">
-                                <i class="fa-brands \${dev.osIcon}"></i> \${dev.osName}
-                            </div>
-                        </td>
-                        <td><strong style="color:#10b981">\${c.amount}</strong></td>
-                    \`;
-                    tbodyConv.appendChild(tr);
-                });
-            }
-
-            // RENDER TAB LIVE CLICK
-            const tbodyClick = document.getElementById('tbl-click');
-            tbodyClick.innerHTML = '';
-            
-            const clickOnlyList = filteredClicks.filter(c => c.type !== 'hit');
-            const limitedClicksForDisplay = clickOnlyList.slice(0, 100);
-
-            if (limitedClicksForDisplay.length === 0) {
-                tbodyClick.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data klik.</td></tr>';
-            } else {
-                limitedClicksForDisplay.forEach(c => {
-                    const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
-                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', browserIcon: 'fa-globe', osName: 'Desktop', browserName: 'Browser' };
-
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = \`
-                        <td>\${formattedTime}</td>
-                        <td><span class="badge-subid">\${c.sub_id}</span></td>
-                        <td><code>\${c.ip}</code></td>
-                        <td><span class="flag-icon">\${c.flag || '🌐'}</span> \${c.country}</td>
-                        <td>
-                            <div class="device-badge">
-                                <i class="fa-brands \${dev.osIcon}"></i>
-                                <i class="fa-brands \${dev.browserIcon}"></i>
-                            </div>
-                        </td>
-                    \`;
-                    tbodyClick.appendChild(tr);
-                });
-            }
-
-            // HITUNG STATISTIK KESELURUHAN & PER NEGARA PER SUB ID
+            // HITUNG STATISTIK KESELURUHAN & BANYAKNYA REVENUE PER SUB ID
             const subIdStats = {};
             const globalUniques = new Set();
             let totalClicks = 0, totalConversions = 0, totalRevenue = 0;
@@ -1135,12 +1077,91 @@ app.get('/', (req, res) => {
                 subIdStats[sId].countries[country].revenue += c.amountVal;
             });
 
-            // UPDATE STATS CARDS
+            // CARI SUB ID DENGAN REVENUE HIGHEST (PEMENANG MAHKOTA)
+            let topSubId = null;
+            let maxRevenue = 0;
+            Object.keys(subIdStats).forEach(sId => {
+                if (subIdStats[sId].revenue > maxRevenue && subIdStats[sId].revenue > 0) {
+                    maxRevenue = subIdStats[sId].revenue;
+                    topSubId = sId;
+                }
+            });
+
+            // UPDATE CARDS STATISTIK
             document.getElementById('card-clicks').innerText = totalClicks;
             document.getElementById('card-uniques').innerText = globalUniques.size;
             document.getElementById('card-conversions').innerText = totalConversions;
             document.getElementById('card-revenue').innerText = '$' + totalRevenue.toFixed(2);
 
+            // RENDER TAB CONVERSION
+            const tbodyConv = document.getElementById('tbl-conv');
+            tbodyConv.innerHTML = '';
+            
+            const searchedConversions = filteredConversions.filter(c => {
+                return c.sub_id.toLowerCase().includes(convSearch) ||
+                       c.country.toLowerCase().includes(convSearch);
+            });
+
+            if (searchedConversions.length === 0) {
+                tbodyConv.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data konversi.</td></tr>';
+            } else {
+                searchedConversions.forEach(c => {
+                    const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
+                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', osName: 'Desktop' };
+                    const isTop = (c.sub_id === topSubId);
+                    
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = \`
+                        <td>\${formattedTime}</td>
+                        <td>
+                            <span class="badge-subid">
+                                \${isTop ? '👑 ' : ''}\${c.sub_id}
+                            </span>
+                        </td>
+                        <td><span class="flag-icon">\${c.flag || '🌐'}</span> \${c.country}</td>
+                        <td>
+                            <div class="device-badge">
+                                <i class="fa-brands \${dev.osIcon}"></i> \${dev.osName}
+                            </div>
+                        </td>
+                        <td><strong style="color:#10b981">\${c.amount}</strong></td>
+                    \`;
+                    tbodyConv.appendChild(tr);
+                });
+            }
+
+            // RENDER TAB LIVE CLICK (SELALU MENGAMBIL 100 KLIK TERBARU TANPA TERPENGARUH FILTER)
+            const tbodyClick = document.getElementById('tbl-click');
+            tbodyClick.innerHTML = '';
+            
+            const clickOnlyList = allClicks.filter(c => c.type !== 'hit');
+            const limitedClicksForDisplay = clickOnlyList.slice(0, 100);
+
+            if (limitedClicksForDisplay.length === 0) {
+                tbodyClick.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data klik.</td></tr>';
+            } else {
+                limitedClicksForDisplay.forEach(c => {
+                    const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
+                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', browserIcon: 'fa-globe', osName: 'Desktop', browserName: 'Browser' };
+
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = \`
+                        <td>\${formattedTime}</td>
+                        <td><span class="badge-subid">\${c.sub_id}</span></td>
+                        <td><code>\${c.ip}</code></td>
+                        <td><span class="flag-icon">\${c.flag || '🌐'}</span> \${c.country}</td>
+                        <td>
+                            <div class="device-badge">
+                                <i class="fa-brands \${dev.osIcon}"></i>
+                                <i class="fa-brands \${dev.browserIcon}"></i>
+                            </div>
+                        </td>
+                    \`;
+                    tbodyClick.appendChild(tr);
+                });
+            }
+
+            // RENDER TOTAL PERFORMANCE PER SUB ID
             const tbodySubId = document.getElementById('tbl-subid-body');
             tbodySubId.innerHTML = '';
 
@@ -1159,6 +1180,7 @@ app.get('/', (req, res) => {
                 const uCount = item.uniques.size;
                 const cr = uCount > 0 ? ((item.conversions / uCount) * 100).toFixed(2) : '0.00';
                 const isExpanded = expandedSubIds.has(subId);
+                const isTop = (subId === topSubId);
 
                 const tr = document.createElement('tr');
                 tr.className = 'clickable-row';
@@ -1168,7 +1190,7 @@ app.get('/', (req, res) => {
                     <td>
                         <span class="badge-subid">
                             <i class="fa-solid \${isExpanded ? 'fa-chevron-down' : 'fa-chevron-right'}" style="font-size:9px;"></i>
-                            \${subId}
+                            \${isTop ? '👑 ' : ''}\${subId}
                         </span>
                     </td>
                     <td>\${item.hits}</td>
@@ -1180,13 +1202,22 @@ app.get('/', (req, res) => {
                 \`;
                 tbodySubId.appendChild(tr);
 
-                // RENDER BARIS EXPAND DETAIL PER NEGARA
+                // RENDER DETAIL PER NEGARA
                 if (isExpanded) {
                     const detailTr = document.createElement('tr');
                     let countryKeys = Object.keys(item.countries);
 
-                    // URUTKAN NEGARA JUGA BERDASARKAN REVENUE TERBESAR
-                    countryKeys.sort((a, b) => item.countries[b].revenue - item.countries[a].revenue);
+                    // URUTKAN NEGARA:
+                    // 1. REVENUE TERBESAR DAHULU
+                    // 2. JIKA REVENUE SAMA (SAMA-SAMA 0), URUTKAN BERDASARKAN KLIK TERBANYAK
+                    countryKeys.sort((a, b) => {
+                        const revA = item.countries[a].revenue;
+                        const revB = item.countries[b].revenue;
+                        if (revB !== revA) {
+                            return revB - revA;
+                        }
+                        return item.countries[b].clicks - item.countries[a].clicks;
+                    });
 
                     let countryRowsHtml = '';
                     countryKeys.forEach(cName => {
