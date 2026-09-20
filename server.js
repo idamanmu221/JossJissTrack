@@ -39,20 +39,18 @@ const ClickSchema = new mongoose.Schema({
     flag: String,
     deviceInfo: Object,
     visitorKey: String,
-    type: { type: String, default: 'click' } // 'hit' atau 'click'
+    type: { type: String, default: 'click' }
 });
 
 const ConversionSchema = new mongoose.Schema({
     id: Number,
     isoDate: String,
     sub_id: String,
-    ip: String,
     country: String,
     flag: String,
     deviceInfo: Object,
     amountVal: Number,
-    amount: String,
-    visitorKey: String
+    amount: String
 });
 
 const ClickModel = mongoose.model('Click', ClickSchema);
@@ -96,30 +94,86 @@ function getFlagEmoji(countryCode) {
     return String.fromCodePoint(...codePoints);
 }
 
-function getDeviceIcons(ua) {
-    let browserIcon = 'fa-globe';
+// PARSER AKURAT OS & BROWSER TERMASUK PERANGKAT MOBILE
+function getDeviceIcons(uaOrReq) {
+    let rawUa = '';
+    
+    if (uaOrReq && uaOrReq.headers && uaOrReq.headers['user-agent']) {
+        rawUa = uaOrReq.headers['user-agent'];
+    } else if (uaOrReq && uaOrReq.source) {
+        rawUa = uaOrReq.source;
+    } else if (typeof uaOrReq === 'string') {
+        rawUa = uaOrReq;
+    }
+
+    const uaLower = rawUa.toLowerCase();
+
+    // 1. DETEKSI OS
     let osIcon = 'fa-desktop';
+    let osName = 'Desktop';
 
-    const browser = ua.browser.toLowerCase();
-    const os = ua.os.toLowerCase();
+    if (uaLower.includes('android')) {
+        osIcon = 'fa-android';
+        osName = 'Android';
+    } else if (uaLower.includes('iphone') || uaLower.includes('ipad') || uaLower.includes('ipod') || uaLower.includes('macintosh') || uaLower.includes('mac os')) {
+        osIcon = 'fa-apple';
+        osName = 'iOS / Mac';
+    } else if (uaLower.includes('windows')) {
+        osIcon = 'fa-windows';
+        osName = 'Windows';
+    } else if (uaLower.includes('linux') || uaLower.includes('cros')) {
+        osIcon = 'fa-linux';
+        osName = 'Linux';
+    }
 
-    if (browser.includes('chrome')) browserIcon = 'fa-chrome';
-    else if (browser.includes('firefox')) browserIcon = 'fa-firefox-browser';
-    else if (browser.includes('safari')) browserIcon = 'fa-safari';
-    else if (browser.includes('edge')) browserIcon = 'fa-edge';
-    else if (browser.includes('opera')) browserIcon = 'fa-opera';
+    // 2. DETEKSI BROWSER
+    let browserIcon = 'fa-globe';
+    let browserName = 'Browser';
 
-    if (os.includes('android')) osIcon = 'fa-android';
-    else if (os.includes('ios') || os.includes('mac')) osIcon = 'fa-apple';
-    else if (os.includes('windows')) osIcon = 'fa-windows';
-    else if (os.includes('linux')) osIcon = 'fa-linux';
-    else if (ua.isMobile) osIcon = 'fa-mobile-screen-button';
+    if (uaLower.includes('edg/') || uaLower.includes('edge')) {
+        browserIcon = 'fa-edge';
+        browserName = 'Edge';
+    } else if (uaLower.includes('opr/') || uaLower.includes('opera')) {
+        browserIcon = 'fa-opera';
+        browserName = 'Opera';
+    } else if (uaLower.includes('samsungbrowser')) {
+        browserIcon = 'fa-globe';
+        browserName = 'Samsung Internet';
+    } else if (uaLower.includes('firefox') || uaLower.includes('fxios')) {
+        browserIcon = 'fa-firefox-browser';
+        browserName = 'Firefox';
+    } else if (uaLower.includes('chrome') || uaLower.includes('crios')) {
+        browserIcon = 'fa-chrome';
+        browserName = 'Chrome';
+    } else if (uaLower.includes('safari') && !uaLower.includes('chrome')) {
+        browserIcon = 'fa-safari';
+        browserName = 'Safari';
+    } else if (uaLower.includes('trident') || uaLower.includes('msie')) {
+        browserIcon = 'fa-internet-explorer';
+        browserName = 'IE';
+    }
 
     return {
-        browserName: ua.browser,
-        osName: ua.os,
+        browserName: browserName,
+        osName: osName,
         browserIcon: browserIcon,
         osIcon: osIcon
+    };
+}
+
+function getOsIconFromPostback(osStr) {
+    if (!osStr) return { osName: 'Unknown', osIcon: 'fa-desktop' };
+    const cleanOs = osStr.trim().toLowerCase();
+
+    let icon = 'fa-desktop';
+    if (cleanOs.includes('android')) icon = 'fa-android';
+    else if (cleanOs.includes('ios') || cleanOs.includes('mac') || cleanOs.includes('iphone') || cleanOs.includes('ipad')) icon = 'fa-apple';
+    else if (cleanOs.includes('windows')) icon = 'fa-windows';
+    else if (cleanOs.includes('linux')) icon = 'fa-linux';
+
+    return {
+        osName: toTitleCase(osStr),
+        osIcon: icon
     };
 }
 
@@ -163,8 +217,10 @@ app.get('/click', async (req, res) => {
 
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const geo = await getGeoLocation(clientIp);
-    const deviceInfo = getDeviceIcons(req.useragent);
+    const deviceInfo = getDeviceIcons(req);
     const now = new Date();
+
+    const userAgentSource = req.headers['user-agent'] || (req.useragent ? req.useragent.source : '');
 
     const baseObj = {
         id: Date.now() + Math.random(),
@@ -174,13 +230,11 @@ app.get('/click', async (req, res) => {
         country: geo.country,
         flag: geo.flag,
         deviceInfo: deviceInfo,
-        visitorKey: `${geo.ip}_${req.useragent.source}`
+        visitorKey: `${geo.ip}_${userAgentSource}`
     };
 
-    // 1. Catat Hit (Page View / Access Attempt)
     await ClickModel.create({ ...baseObj, type: 'hit' });
 
-    // 2. Catat Click (Redirect Sukses ke Offer)
     const clickObj = { ...baseObj, type: 'click' };
     await ClickModel.create(clickObj);
     io.emit('new-click', clickObj);
@@ -222,8 +276,10 @@ app.post('/api/track-click', async (req, res) => {
     const subId = req.body.sub_id || req.query.sub_id || 'sub1';
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const geo = await getGeoLocation(clientIp);
-    const deviceInfo = getDeviceIcons(req.useragent);
+    const deviceInfo = getDeviceIcons(req);
     const now = new Date();
+
+    const userAgentSource = req.headers['user-agent'] || (req.useragent ? req.useragent.source : '');
 
     const baseObj = {
         id: Date.now() + Math.random(),
@@ -233,7 +289,7 @@ app.post('/api/track-click', async (req, res) => {
         country: geo.country,
         flag: geo.flag,
         deviceInfo: deviceInfo,
-        visitorKey: `${geo.ip}_${req.useragent.source}`
+        visitorKey: `${geo.ip}_${userAgentSource}`
     };
 
     await ClickModel.create({ ...baseObj, type: 'hit' });
@@ -243,7 +299,7 @@ app.post('/api/track-click', async (req, res) => {
     res.json({ status: 'ok' });
 });
 
-// FUNGSI PROSES KONVERSI POSTBACK DENGAN PEMETAAN NAMA NEGARA LENGKAP & KODE ISO
+// FUNGSI PROSES KONVERSI POSTBACK
 async function processConversion(req, res) {
     const subId = req.query.sub_id || req.body.sub_id || 
                   req.query.click_id || req.body.click_id || 
@@ -258,7 +314,6 @@ async function processConversion(req, res) {
     const rawCountry = req.query.country || req.body.country;
     let countryName = 'Unknown';
     let flagEmoji = '🌐';
-    let clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
 
     if (rawCountry && rawCountry.trim() !== '' && rawCountry !== '{country}') {
         const cleanedCountry = rawCountry.trim().toUpperCase();
@@ -274,32 +329,36 @@ async function processConversion(req, res) {
             countryName = toTitleCase(rawCountry.trim());
             flagEmoji = '🌐';
         }
-    } else {
-        const geo = await getGeoLocation(clientIp);
-        countryName = geo.country;
-        flagEmoji = geo.flag;
-        clientIp = geo.ip;
     }
 
-    const deviceInfo = getDeviceIcons(req.useragent);
+    const rawOs = req.query.os || req.body.os;
+    let devInfo = { osName: 'Desktop', osIcon: 'fa-desktop' };
+
+    if (rawOs && rawOs.trim() !== '' && rawOs !== '{os}') {
+        devInfo = getOsIconFromPostback(rawOs);
+    } else {
+        const matchedClick = await ClickModel.findOne({ sub_id: subId, type: 'click' }).sort({ _id: -1 });
+        if (matchedClick && matchedClick.deviceInfo) {
+            devInfo = matchedClick.deviceInfo;
+        }
+    }
+
     const now = new Date();
 
     const convObj = {
         id: Date.now() + Math.random(),
         isoDate: now.toISOString(),
         sub_id: subId,
-        ip: clientIp,
         country: countryName,
         flag: flagEmoji,
-        deviceInfo: deviceInfo,
+        deviceInfo: devInfo,
         amountVal: amountVal,
-        amount: '$' + amountVal.toFixed(2),
-        visitorKey: `${clientIp}_${req.useragent.source}`
+        amount: '$' + amountVal.toFixed(2)
     };
 
     await ConversionModel.create(convObj);
     io.emit('new-conversion', convObj);
-    console.log(`[CONVERSION SUCCESS] SubID: ${subId} | Amount: $${amountVal} | Country: ${countryName} (${flagEmoji})`);
+    console.log(`[CONVERSION SUCCESS] SubID: ${subId} | Amount: $${amountVal} | Country: ${countryName} | OS: ${devInfo.osName}`);
 
     return res.json({ status: 'ok', sub_id: subId, amount: amountVal, country: countryName });
 }
@@ -338,7 +397,7 @@ app.get('/api/clear-all-data', async (req, res) => {
     }
 });
 
-// Serve Dashboard UI (Mobile Friendly, Filters UTC, Max 100 Live Clicks)
+// Serve Dashboard UI
 app.get('/', (req, res) => {
     res.send(`
 <!DOCTYPE html>
@@ -633,7 +692,7 @@ app.get('/', (req, res) => {
             <div class="table-responsive">
                 <table>
                     <thead>
-                        <tr><th class="th-time">Waktu</th><th>Sub ID</th><th>IP</th><th>Negara</th><th>Perangkat</th><th>Value ($)</th></tr>
+                        <tr><th class="th-time">Waktu</th><th>Sub ID</th><th>Negara</th><th>Perangkat</th><th>Value ($)</th></tr>
                     </thead>
                     <tbody id="tbl-conv"></tbody>
                 </table>
@@ -906,33 +965,30 @@ app.get('/', (req, res) => {
                 return true;
             });
 
-            // TAB CONVERSION
+            // RENDER TAB CONVERSION
             const tbodyConv = document.getElementById('tbl-conv');
             tbodyConv.innerHTML = '';
             
             const searchedConversions = filteredConversions.filter(c => {
                 return c.sub_id.toLowerCase().includes(convSearch) ||
-                       c.ip.toLowerCase().includes(convSearch) ||
                        c.country.toLowerCase().includes(convSearch);
             });
 
             if (searchedConversions.length === 0) {
-                tbodyConv.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #94a3b8;">Tidak ada data konversi.</td></tr>';
+                tbodyConv.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data konversi.</td></tr>';
             } else {
                 searchedConversions.forEach(c => {
                     const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
-                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', browserIcon: 'fa-globe', osName: 'Desktop', browserName: 'Browser' };
+                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', osName: 'Desktop' };
                     
                     const tr = document.createElement('tr');
                     tr.innerHTML = \`
                         <td>\${formattedTime}</td>
                         <td><span class="badge-subid">\${c.sub_id}</span></td>
-                        <td><code>\${c.ip}</code></td>
                         <td><span class="flag-icon">\${c.flag || '🌐'}</span> \${c.country}</td>
                         <td>
                             <div class="device-badge">
-                                <i class="fa-brands \${dev.osIcon}"></i>
-                                <i class="fa-brands \${dev.browserIcon}"></i>
+                                <i class="fa-brands \${dev.osIcon}"></i> \${dev.osName}
                             </div>
                         </td>
                         <td><strong style="color:#10b981">\${c.amount}</strong></td>
@@ -941,7 +997,7 @@ app.get('/', (req, res) => {
                 });
             }
 
-            // TAB LIVE CLICK (MAX 100 CLICK DATA)
+            // RENDER TAB LIVE CLICK
             const tbodyClick = document.getElementById('tbl-click');
             tbodyClick.innerHTML = '';
             
@@ -1072,7 +1128,7 @@ app.get('/', (req, res) => {
     `);
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`Server berjalan di port ${PORT}`);
 });
