@@ -127,45 +127,36 @@ function getDeviceIcons(uaOrReq) {
         osName = 'Linux';
     }
 
-    let browserIcon = 'fa-globe';
-    let browserClass = 'browser-globe';
+    let browserType = 'globe';
     let browserName = 'Browser';
 
     if (uaLower.includes('edg/') || uaLower.includes('edge')) {
-        browserIcon = 'fa-edge';
-        browserClass = 'browser-edge';
+        browserType = 'edge';
         browserName = 'Edge';
     } else if (uaLower.includes('opr/') || uaLower.includes('opera')) {
-        browserIcon = 'fa-opera';
-        browserClass = 'browser-opera';
+        browserType = 'opera';
         browserName = 'Opera';
     } else if (uaLower.includes('samsungbrowser')) {
-        browserIcon = 'fa-globe';
-        browserClass = 'browser-samsung';
+        browserType = 'samsung';
         browserName = 'Samsung Internet';
     } else if (uaLower.includes('firefox') || uaLower.includes('fxios')) {
-        browserIcon = 'fa-firefox-browser';
-        browserClass = 'browser-firefox';
+        browserType = 'firefox';
         browserName = 'Firefox';
     } else if (uaLower.includes('chrome') || uaLower.includes('crios')) {
-        browserIcon = 'fa-chrome';
-        browserClass = 'browser-chrome';
+        browserType = 'chrome';
         browserName = 'Chrome';
     } else if (uaLower.includes('safari') && !uaLower.includes('chrome')) {
-        browserIcon = 'fa-safari';
-        browserClass = 'browser-safari';
+        browserType = 'safari';
         browserName = 'Safari';
     } else if (uaLower.includes('trident') || uaLower.includes('msie')) {
-        browserIcon = 'fa-internet-explorer';
-        browserClass = 'browser-ie';
+        browserType = 'ie';
         browserName = 'IE';
     }
 
     return {
         browserName: browserName,
         osName: osName,
-        browserIcon: browserIcon,
-        browserClass: browserClass,
+        browserType: browserType,
         osIcon: osIcon,
         osClass: osClass
     };
@@ -597,6 +588,13 @@ app.get('/', (req, res) => {
             background: var(--sub-panel-bg); padding: 4px 8px; border-radius: 4px; font-size: 12px; color: var(--text-color);
         }
 
+        .browser-svg {
+            width: 15px;
+            height: 15px;
+            vertical-align: middle;
+            display: inline-block;
+        }
+
         /* WARNA IKON BRAND OS */
         .os-android { color: #3ddc84; }
         .os-apple { color: #a2aaad; }
@@ -604,16 +602,6 @@ app.get('/', (req, res) => {
         .os-windows { color: #0078d4; }
         .os-linux { color: #f29100; }
         .os-desktop { color: #64748b; }
-
-        /* WARNA IKON BRAND BROWSER */
-        .browser-chrome { color: #ea4335; }
-        .browser-firefox { color: #ff7139; }
-        .browser-safari { color: #0066cc; }
-        .browser-edge { color: #0078d4; }
-        .browser-opera { color: #ff1b2d; }
-        .browser-samsung { color: #1428a0; }
-        .browser-ie { color: #00a4ef; }
-        .browser-globe { color: #64748b; }
 
         .country-detail-container {
             background: var(--row-expand-bg); padding: 10px 15px; border-radius: 6px; margin: 4px 0; border: 1px solid var(--border-color);
@@ -790,6 +778,27 @@ app.get('/', (req, res) => {
 
         let userRole = localStorage.getItem('user_role') || null;
         let expandedSubIds = new Set();
+
+        function getBrowserSvg(type) {
+            switch(type) {
+                case 'chrome':
+                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 12L7.5 4.2A9.95 9.95 0 0 1 12 2c5.5 0 10 4.5 10 10 0 1.2-.2 2.3-.6 3.4L15 12h-3z"/><path fill="#34A853" d="M12 12l-4.5 7.8c1.3.8 2.8 1.2 4.5 1.2 5.5 0 10-4.5 10-10 0-1.2-.2-2.3-.6-3.4L12 12z" opacity="0"/><path fill="#4285F4" d="M12 2A10 10 0 0 0 2 12c0 3.7 2 6.9 5 8.7L11.5 13 12 12h-3z" opacity="0"/><path fill="#4285F4" d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/><path fill="#EA4335" d="M12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.5 1.3 5L8 9.2 12 2z"/><path fill="#FBBC05" d="M2 12c0 4 2.4 7.4 5.8 9l4.7-8.2L8 9.2 2 12z"/><path fill="#34A853" d="M12 22c4.4 0 8.2-2.8 9.5-6.8H11l1 6.8z"/></svg>\`;
+                case 'firefox':
+                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><path fill="#FF7139" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm6.9 7.4a7.8 7.8 0 0 1-5.7 8.3 7.7 7.7 0 0 1-8.5-4.4 7.9 7.9 0 0 1 1.7-8.7A8 8 0 0 1 15 3.8a6.5 6.5 0 0 0-3.3 2.5 4.3 4.3 0 0 0 3.6 1.8 5 5 0 0 1 3.6 1.3z"/><path fill="#FFBD4F" d="M15 3.8a8 8 0 0 1 3.9 3.6 6.5 6.5 0 0 0-3.3-1.6 4.3 4.3 0 0 0-3.6 1.8 5 5 0 0 1 3-3.8z"/></svg>\`;
+                case 'edge':
+                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><path fill="#0078D4" d="M12 2C6.5 2 2 6.5 2 12c0 2.2.7 4.2 2 5.8l6-10.8C10.6 5.8 11.8 5 13 5c2.8 0 5 2.2 5 5 0 1.5-.7 2.9-1.8 3.8l5.2 3.1C22.4 15.3 23 13.7 23 12c0-5.5-4.5-10-11-10z"/><path fill="#50E6FF" d="M4 17.8C5.8 20.3 8.7 22 12 22c4.8 0 8.9-3.4 9.8-8l-5.2-3.1c-.8.7-1.8 1.1-2.8 1.1-2.4 0-4.3-1.7-4.8-4L4 17.8z"/></svg>\`;
+                case 'safari':
+                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#0066CC"/><path fill="#FFF" d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0 1.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13z"/><polygon fill="#FF3B30" points="12,12 16.5,7.5 13.5,13.5"/><polygon fill="#E5E5EA" points="12,12 7.5,16.5 10.5,10.5"/></svg>\`;
+                case 'opera':
+                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><path fill="#FF1B2D" d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6z"/><ellipse cx="12" cy="12" rx="3" ry="5.5" fill="#FFF"/></svg>\`;
+                case 'samsung':
+                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1428A0"/><path fill="#FFF" d="M6 12c0-2.2 2.7-4 6-4s6 1.8 6 4-2.7 4-6 4-6-1.8-6-4z"/></svg>\`;
+                case 'ie':
+                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><path fill="#00A4EF" d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/><path fill="#FFB900" d="M4 10c1-3 4-5 8-5 5 0 9 3 9 8 0 1 0 2-.3 3L4 10z" opacity="0.8"/></svg>\`;
+                default:
+                    return \`<i class="fa-solid fa-globe" style="font-size:14px; color:#64748b;"></i>\`;
+            }
+        }
 
         function checkSession() {
             if (userRole === 'admin' || userRole === 'guest') {
@@ -1182,7 +1191,8 @@ app.get('/', (req, res) => {
             } else {
                 limitedClicksForDisplay.forEach(c => {
                     const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
-                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', browserIcon: 'fa-globe', browserClass: 'browser-globe', osName: 'Desktop', browserName: 'Browser' };
+                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', browserType: 'globe', osName: 'Desktop', browserName: 'Browser' };
+                    const browserSvg = getBrowserSvg(dev.browserType || 'globe');
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = \`
@@ -1193,7 +1203,7 @@ app.get('/', (req, res) => {
                         <td>
                             <div class="device-badge">
                                 <i class="fa-brands \${dev.osIcon} \${dev.osClass || ''}"></i>
-                                <i class="fa-brands \${dev.browserIcon} \${dev.browserClass || ''}"></i>
+                                \${browserSvg}
                             </div>
                         </td>
                     \`;
