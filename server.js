@@ -86,14 +86,12 @@ function toTitleCase(str) {
 }
 
 function getFlagEmoji(countryCode) {
-    if (!countryCode || countryCode === 'XX' || countryCode === 'LOCAL') return '🌐';
-    const codePoints = countryCode
-        .toUpperCase()
-        .split('')
-        .map(char => 127397 + char.charCodeAt());
-    return String.fromCodePoint(...codePoints);
+    if (!countryCode || countryCode === 'XX' || countryCode === 'LOCAL') {
+        return '<i class="fa-solid fa-globe" style="font-size:14px;"></i>';
+    }
+    const code = countryCode.toLowerCase();
+    return `<img src="https://flagcdn.com/24x18/${code}.png" class="flag-img" alt="${countryCode}">`;
 }
-
 function getDeviceIcons(uaOrReq) {
     let rawUa = '';
     if (uaOrReq && uaOrReq.headers && uaOrReq.headers['user-agent']) {
@@ -575,7 +573,17 @@ app.get('/', (req, res) => {
         .country-detail-table td {
             padding: 6px 8px; border-bottom: 1px dashed var(--border-color);
         }
-
+        
+        .flag-img {
+            width: 18px;
+            height: 13px;
+            object-fit: cover;
+            border-radius: 2px;
+            vertical-align: middle;
+            margin-right: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
         .hidden { display: none !important; }
     </style>
 </head>
