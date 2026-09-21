@@ -588,11 +588,15 @@ app.get('/', (req, res) => {
             background: var(--sub-panel-bg); padding: 4px 8px; border-radius: 4px; font-size: 12px; color: var(--text-color);
         }
 
+        /* SVG BROWSER PROPORSI Sempurna */
         .browser-svg {
-            width: 15px;
-            height: 15px;
+            width: 16px;
+            height: 16px;
+            min-width: 16px;
+            min-height: 16px;
             vertical-align: middle;
             display: inline-block;
+            flex-shrink: 0;
         }
 
         /* WARNA IKON BRAND OS */
@@ -779,22 +783,23 @@ app.get('/', (req, res) => {
         let userRole = localStorage.getItem('user_role') || null;
         let expandedSubIds = new Set();
 
+        // IKON SVG RESMI MULTI-WARNA UNTUK SEMUA BROWSER
         function getBrowserSvg(type) {
             switch(type) {
                 case 'chrome':
-                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><path fill="#EA4335" d="M12 12L7.5 4.2A9.95 9.95 0 0 1 12 2c5.5 0 10 4.5 10 10 0 1.2-.2 2.3-.6 3.4L15 12h-3z"/><path fill="#34A853" d="M12 12l-4.5 7.8c1.3.8 2.8 1.2 4.5 1.2 5.5 0 10-4.5 10-10 0-1.2-.2-2.3-.6-3.4L12 12z" opacity="0"/><path fill="#4285F4" d="M12 2A10 10 0 0 0 2 12c0 3.7 2 6.9 5 8.7L11.5 13 12 12h-3z" opacity="0"/><path fill="#4285F4" d="M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/><path fill="#EA4335" d="M12 2C6.5 2 2 6.5 2 12c0 1.8.5 3.5 1.3 5L8 9.2 12 2z"/><path fill="#FBBC05" d="M2 12c0 4 2.4 7.4 5.8 9l4.7-8.2L8 9.2 2 12z"/><path fill="#34A853" d="M12 22c4.4 0 8.2-2.8 9.5-6.8H11l1 6.8z"/></svg>\`;
+                    return \`<svg class="browser-svg" viewBox="0 0 192 192"><circle cx="96" cy="96" r="36" fill="#1a73e8"/><path fill="#ea4335" d="M162.7 65.4A72 72 0 0 0 96 24V96h66.7z"/><path fill="#fbbc04" d="M96 168a72 72 0 0 0 62.3-36l-31.1-53.9L96 168z"/><path fill="#34a853" d="M29.3 132a72 72 0 0 0 66.7 36V96H29.3z"/><path fill="#ea4335" d="M96 24A72 72 0 0 0 29.3 65.4l31.2 53.9L96 24z"/></svg>\`;
                 case 'firefox':
-                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><path fill="#FF7139" d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm6.9 7.4a7.8 7.8 0 0 1-5.7 8.3 7.7 7.7 0 0 1-8.5-4.4 7.9 7.9 0 0 1 1.7-8.7A8 8 0 0 1 15 3.8a6.5 6.5 0 0 0-3.3 2.5 4.3 4.3 0 0 0 3.6 1.8 5 5 0 0 1 3.6 1.3z"/><path fill="#FFBD4F" d="M15 3.8a8 8 0 0 1 3.9 3.6 6.5 6.5 0 0 0-3.3-1.6 4.3 4.3 0 0 0-3.6 1.8 5 5 0 0 1 3-3.8z"/></svg>\`;
+                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><path fill="#ff9500" d="M16 2A14 14 0 1 0 30 16 14 14 0 0 0 16 2zm8 10a10 10 0 1 1-10-10 10 10 0 0 1 10 10z"/><path fill="#ff1b2d" d="M22 10a8 8 0 1 0-8 8 8 8 0 0 0 8-8z"/><path fill="#30b3ff" d="M16 12a4 4 0 1 0 4 4 4 4 0 0 0-4-4z"/></svg>\`;
                 case 'edge':
-                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><path fill="#0078D4" d="M12 2C6.5 2 2 6.5 2 12c0 2.2.7 4.2 2 5.8l6-10.8C10.6 5.8 11.8 5 13 5c2.8 0 5 2.2 5 5 0 1.5-.7 2.9-1.8 3.8l5.2 3.1C22.4 15.3 23 13.7 23 12c0-5.5-4.5-10-11-10z"/><path fill="#50E6FF" d="M4 17.8C5.8 20.3 8.7 22 12 22c4.8 0 8.9-3.4 9.8-8l-5.2-3.1c-.8.7-1.8 1.1-2.8 1.1-2.4 0-4.3-1.7-4.8-4L4 17.8z"/></svg>\`;
+                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><path fill="#0078d4" d="M16 2A14 14 0 0 0 2 16a14 14 0 0 0 21 12l-6-11h9a14 14 0 0 0-10-15z"/><path fill="#50e6ff" d="M16 30a14 14 0 0 0 12-7l-7-4a6 6 0 1 1-5-9l-6 11a14 14 0 0 0 6 9z"/></svg>\`;
                 case 'safari':
-                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#0066CC"/><path fill="#FFF" d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16zm0 1.5a6.5 6.5 0 1 1 0 13 6.5 6.5 0 0 1 0-13z"/><polygon fill="#FF3B30" points="12,12 16.5,7.5 13.5,13.5"/><polygon fill="#E5E5EA" points="12,12 7.5,16.5 10.5,10.5"/></svg>\`;
+                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="#0066cc"/><path fill="#ffffff" d="M16 4a12 12 0 1 0 12 12A12 12 0 0 0 16 4zm0 2a10 10 0 1 1-10 10A10 10 0 0 1 16 6z"/><polygon fill="#ff3b30" points="16,16 22,10 18,18"/><polygon fill="#e5e5ea" points="16,16 10,22 14,14"/></svg>\`;
                 case 'opera':
-                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><path fill="#FF1B2D" d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm0 16c-3.3 0-6-2.7-6-6s2.7-6 6-6 6 2.7 6 6-2.7 6-6 6z"/><ellipse cx="12" cy="12" rx="3" ry="5.5" fill="#FFF"/></svg>\`;
+                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><path fill="#ff1b2d" d="M16 2C8.3 2 2 8.3 2 16s6.3 14 14 14 14-6.3 14-14S23.7 2 16 2zm0 22c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8z"/><ellipse cx="16" cy="16" rx="4" ry="8" fill="#ffffff"/></svg>\`;
                 case 'samsung':
-                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="#1428A0"/><path fill="#FFF" d="M6 12c0-2.2 2.7-4 6-4s6 1.8 6 4-2.7 4-6 4-6-1.8-6-4z"/></svg>\`;
+                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="#1428a0"/><path fill="#ffffff" d="M8 16c0-3.3 3.6-6 8-6s8 2.7 8 6-3.6 6-8 6-8-2.7-8-6z"/></svg>\`;
                 case 'ie':
-                    return \`<svg class="browser-svg" viewBox="0 0 24 24"><path fill="#00A4EF" d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/><path fill="#FFB900" d="M4 10c1-3 4-5 8-5 5 0 9 3 9 8 0 1 0 2-.3 3L4 10z" opacity="0.8"/></svg>\`;
+                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><path fill="#00a4ef" d="M16 2A14 14 0 1 0 30 16 14 14 0 0 0 16 2zm2 20h-4v-8h4v8zm0-10h-4V8h4v4z"/><path fill="#ffb900" d="M6 14c1.5-4 5.5-7 10-7 6.6 0 12 4 12 10 0 1.5-.3 3-.8 4L6 14z" opacity="0.85"/></svg>\`;
                 default:
                     return \`<i class="fa-solid fa-globe" style="font-size:14px; color:#64748b;"></i>\`;
             }
