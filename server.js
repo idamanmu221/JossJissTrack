@@ -17,14 +17,14 @@ app.use(express.urlencoded({ extended: true }));
 const IMONETIZEIT_BASE_URL = 'https://kebkzw.dlstinguishedate.net/?utm_source=da57dc555e50572d&ban=fb&j1=1&s1=205200&s2=2060889';
 
 // GANTI DENGAN CONNECTION STRING MONGODB ATLAS ANDA
-const MONGODB_URI = 'mongodb+srv://idamanmu221_db_user:eWoay7EzZ4SYskzI@cluster0.oqtct5v.mongodb.net/?appName=Cluster0';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb+srv://idamanmu221_db_user:eWoay7EzZ4SYskzI@cluster0.oqtct5v.mongodb.net/?appName=Cluster0';
 
 const PASSWORDS = {
     admin: 'admin123',
     guest: 'user123'
 };
 
-// CONNECT TO MONGODB ATLAS
+// CONNECT TO MONGODB ATLAS (DENGAN SAFE ERROR HANDLING)
 mongoose.connect(MONGODB_URI)
     .then(() => console.log('[DB] Terhubung secara permanen ke MongoDB Atlas!'))
     .catch(err => console.error('[DB] Gagal terhubung ke MongoDB:', err.message));
@@ -245,7 +245,10 @@ app.get('/click', async (req, res) => {
         type: 'click'
     };
 
-    await ClickModel.create(clickObj);
+    try {
+        await ClickModel.create(clickObj);
+    } catch (e) {}
+    
     io.emit('new-click', clickObj);
 
     const encodedSubId = encodeURIComponent(subId);
@@ -302,7 +305,10 @@ app.post('/api/track-click', async (req, res) => {
         type: 'click'
     };
 
-    await ClickModel.create(clickObj);
+    try {
+        await ClickModel.create(clickObj);
+    } catch (e) {}
+    
     io.emit('new-click', clickObj);
     res.json({ status: 'ok' });
 });
@@ -345,10 +351,12 @@ async function processConversion(req, res) {
     if (rawOs && rawOs.trim() !== '' && rawOs !== '{os}') {
         devInfo = getOsIconFromPostback(rawOs);
     } else {
-        const matchedClick = await ClickModel.findOne({ sub_id: subId, type: 'click' }).sort({ _id: -1 });
-        if (matchedClick && matchedClick.deviceInfo) {
-            devInfo = matchedClick.deviceInfo;
-        }
+        try {
+            const matchedClick = await ClickModel.findOne({ sub_id: subId, type: 'click' }).sort({ _id: -1 });
+            if (matchedClick && matchedClick.deviceInfo) {
+                devInfo = matchedClick.deviceInfo;
+            }
+        } catch (e) {}
     }
 
     const now = new Date();
@@ -364,7 +372,10 @@ async function processConversion(req, res) {
         amount: '$' + amountVal.toFixed(2)
     };
 
-    await ConversionModel.create(convObj);
+    try {
+        await ConversionModel.create(convObj);
+    } catch (e) {}
+    
     io.emit('new-conversion', convObj);
     console.log(`[CONVERSION SUCCESS] SubID: ${subId} | Amount: $${amountVal} | Country: ${countryName} | OS: ${devInfo.osName}`);
 
@@ -588,7 +599,6 @@ app.get('/', (req, res) => {
             background: var(--sub-panel-bg); padding: 4px 8px; border-radius: 4px; font-size: 12px; color: var(--text-color);
         }
 
-        /* GAMBAR BROWSER RESMI CDN - PRESISI & PROPORSIONAL */
         .browser-img {
             width: 15px;
             height: 15px;
@@ -597,7 +607,6 @@ app.get('/', (req, res) => {
             display: inline-block;
         }
 
-        /* WARNA IKON BRAND OS */
         .os-android { color: #3ddc84; }
         .os-apple { color: #a2aaad; }
         [data-theme="dark"] .os-apple { color: #ffffff; }
@@ -771,19 +780,18 @@ app.get('/', (req, res) => {
     </div>
 
     <script>
-        document.addEventListener('contextmenu', e => e.preventDefault());
-        document.addEventListener('keydown', e => {
-            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].includes(e.key.toUpperCase())) || (e.ctrlKey && e.key.toUpperCase() === 'U')) {
+        document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'F12' || (e.ctrlKey && e.shiftKey && ['I','J','C'].indexOf(e.key.toUpperCase()) !== -1) || (e.ctrlKey && e.key.toUpperCase() === 'U')) {
                 e.preventDefault();
             }
         });
 
-        let userRole = localStorage.getItem('user_role') || null;
-        let expandedSubIds = new Set();
+        var userRole = localStorage.getItem('user_role') || null;
+        var expandedSubIds = new Set();
 
-        // MENAMPILKAN IKON GAMBAR LOGO BROWSER DARI CDN RESMI
         function getBrowserIconHtml(type) {
-            let url = '';
+            var url = '';
             switch(type) {
                 case 'chrome':
                     url = 'https://cdnjs.cloudflare.com/ajax/libs/browser-logos/74.0.0/chrome/chrome_24x24.png';
@@ -809,7 +817,7 @@ app.get('/', (req, res) => {
                 default:
                     return '<i class="fa-solid fa-globe" style="font-size:14px; color:#64748b;"></i>';
             }
-            return `<img src="${url}" class="browser-img" alt="${type}">`;
+            return '<img src="' + url + '" class="browser-img" alt="' + type + '">';
         }
 
         function checkSession() {
@@ -826,24 +834,26 @@ app.get('/', (req, res) => {
         }
 
         async function attemptLogin() {
-            const pass = document.getElementById('passInput').value;
-            const res = await fetch('/api/login', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ password: pass })
-            });
+            var pass = document.getElementById('passInput').value;
+            try {
+                var res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: pass })
+                });
 
-            if (res.ok) {
-                const data = await res.json();
-                userRole = data.role;
-                localStorage.setItem('user_role', userRole);
-                document.getElementById('loginError').style.display = 'none';
-                document.getElementById('passInput').value = '';
-                checkSession();
-                fetchInitialData();
-            } else {
-                document.getElementById('loginError').style.display = 'block';
-            }
+                if (res.ok) {
+                    var data = await res.json();
+                    userRole = data.role;
+                    localStorage.setItem('user_role', userRole);
+                    document.getElementById('loginError').style.display = 'none';
+                    document.getElementById('passInput').value = '';
+                    checkSession();
+                    fetchInitialData();
+                } else {
+                    document.getElementById('loginError').style.display = 'block';
+                }
+            } catch(e) {}
         }
 
         function logoutCurrentSession() {
@@ -854,43 +864,42 @@ app.get('/', (req, res) => {
 
         async function fetchInitialData() {
             try {
-                const res = await fetch('/api/initial-data');
+                var res = await fetch('/api/initial-data');
                 if (res.ok) {
-                    const data = await res.json();
+                    var data = await res.json();
                     allClicks = data.clicksHistory || [];
                     allConversions = data.conversionsHistory || [];
-                    
                     setPreset('today');
                 }
             } catch (err) {}
         }
 
         function generateLink() {
-            const inputVal = document.getElementById('genSubId').value.trim();
-            const subId = inputVal !== '' ? inputVal : 'sub1';
-            const baseUrl = window.location.origin;
-            const finalUrl = \`\${baseUrl}/click?sub_id=\${encodeURIComponent(subId)}\`;
+            var inputVal = document.getElementById('genSubId').value.trim();
+            var subId = inputVal !== '' ? inputVal : 'sub1';
+            var baseUrl = window.location.origin;
+            var finalUrl = baseUrl + '/click?sub_id=' + encodeURIComponent(subId);
 
             document.getElementById('generatedUrl').value = finalUrl;
             document.getElementById('genResultBox').style.display = 'block';
         }
 
         function copyGeneratedLink() {
-            const copyText = document.getElementById('generatedUrl');
+            var copyText = document.getElementById('generatedUrl');
             copyText.select();
             navigator.clipboard.writeText(copyText.value);
             alert("📋 Link berhasil disalin!");
         }
 
         function initTheme() {
-            const savedTheme = localStorage.getItem('theme') || 'light';
+            var savedTheme = localStorage.getItem('theme') || 'light';
             document.documentElement.setAttribute('data-theme', savedTheme);
             updateThemeIcon(savedTheme);
         }
 
         function toggleTheme() {
-            const currentTheme = document.documentElement.getAttribute('data-theme');
-            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            var currentTheme = document.documentElement.getAttribute('data-theme');
+            var newTheme = currentTheme === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
             updateThemeIcon(newTheme);
@@ -900,44 +909,44 @@ app.get('/', (req, res) => {
             document.getElementById('themeIcon').className = theme === 'dark' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
         }
 
-        let selectedTimezoneOffset = 0;
+        var selectedTimezoneOffset = 0;
 
         function onTimezoneChange() {
             selectedTimezoneOffset = parseInt(document.getElementById('tzSelect').value);
-            const label = selectedTimezoneOffset === 7 ? 'Waktu (WIB)' : 'Waktu (UTC)';
-            document.querySelectorAll('.th-time').forEach(el => el.innerText = label);
+            var label = selectedTimezoneOffset === 7 ? 'Waktu (WIB)' : 'Waktu (UTC)';
+            document.querySelectorAll('.th-time').forEach(function(el) { el.innerText = label; });
             updateClock();
             renderAnalytics();
         }
 
         function formatDateTimeByOffset(isoDateStr, offsetHours) {
-            const date = new Date(isoDateStr);
-            const targetTime = new Date(date.getTime() + (offsetHours * 60 * 60 * 1000));
+            var date = new Date(isoDateStr);
+            var targetTime = new Date(date.getTime() + (offsetHours * 60 * 60 * 1000));
 
-            const year = targetTime.getUTCFullYear();
-            const month = String(targetTime.getUTCMonth() + 1).padStart(2, '0');
-            const day = String(targetTime.getUTCDate()).padStart(2, '0');
-            const hours = String(targetTime.getUTCHours()).padStart(2, '0');
-            const minutes = String(targetTime.getUTCMinutes()).padStart(2, '0');
-            const seconds = String(targetTime.getUTCSeconds()).padStart(2, '0');
+            var year = targetTime.getUTCFullYear();
+            var month = String(targetTime.getUTCMonth() + 1).padStart(2, '0');
+            var day = String(targetTime.getUTCDate()).padStart(2, '0');
+            var hours = String(targetTime.getUTCHours()).padStart(2, '0');
+            var minutes = String(targetTime.getUTCMinutes()).padStart(2, '0');
+            var seconds = String(targetTime.getUTCSeconds()).padStart(2, '0');
 
-            return \`\${year}-\${month}-\${day} \${hours}:\${minutes}:\${seconds}\`;
+            return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
         }
 
         function updateClock() {
-            const nowIso = new Date().toISOString();
+            var nowIso = new Date().toISOString();
             document.getElementById('liveClock').innerText = formatDateTimeByOffset(nowIso, selectedTimezoneOffset).split(' ')[1];
         }
 
         setInterval(updateClock, 1000);
 
-        let allClicks = [];
-        let allConversions = [];
+        var allClicks = [];
+        var allConversions = [];
 
-        let filterStartDate = null;
-        let filterEndDate = null;
+        var filterStartDate = null;
+        var filterEndDate = null;
 
-        const fpStart = flatpickr("#startDatePicker", {
+        var fpStart = flatpickr("#startDatePicker", {
             dateFormat: "Y-m-d",
             onChange: function(selectedDates) {
                 filterStartDate = selectedDates[0] ? selectedDates[0] : null;
@@ -946,7 +955,7 @@ app.get('/', (req, res) => {
             }
         });
 
-        const fpEnd = flatpickr("#endDatePicker", {
+        var fpEnd = flatpickr("#endDatePicker", {
             dateFormat: "Y-m-d",
             onChange: function(selectedDates) {
                 if (selectedDates[0]) {
@@ -969,9 +978,9 @@ app.get('/', (req, res) => {
 
         function setPreset(preset) {
             clearActiveButtons();
-            const now = new Date();
-            let start = new Date();
-            let end = new Date();
+            var now = new Date();
+            var start = new Date();
+            var end = new Date();
             
             if (preset === 'today') {
                 document.getElementById('btn-today').classList.add('active');
@@ -983,7 +992,7 @@ app.get('/', (req, res) => {
                 end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 1, 23, 59, 59, 999));
             } else if (preset === 'week') {
                 document.getElementById('btn-week').classList.add('active');
-                const day = now.getUTCDay() || 7;
+                var day = now.getUTCDay() || 7;
                 start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - day + 1, 0, 0, 0, 0));
                 end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59, 999));
             } else if (preset === 'month') {
@@ -1010,8 +1019,8 @@ app.get('/', (req, res) => {
             renderAnalytics();
         }
 
-        const btn = document.getElementById('toggleBtn');
-        const menu = document.getElementById('navMenu');
+        var btn = document.getElementById('toggleBtn');
+        var menu = document.getElementById('navMenu');
 
         btn.onclick = function(e) {
             e.stopPropagation();
@@ -1029,7 +1038,7 @@ app.get('/', (req, res) => {
             document.getElementById('conv-sec').classList.add('hidden');
             document.getElementById('click-sec').classList.add('hidden');
 
-            const filterBar = document.getElementById('dateFilterBar');
+            var filterBar = document.getElementById('dateFilterBar');
 
             if (viewType === 'subid') {
                 document.getElementById('subid-sec').classList.remove('hidden');
@@ -1054,49 +1063,49 @@ app.get('/', (req, res) => {
             renderAnalytics();
         }
 
-        const socket = io();
+        var socket = io();
 
-        socket.on('force-logout-all', () => {
+        socket.on('force-logout-all', function() {
             alert('🔒 Akses Anda telah dikeluarkan!');
             logoutCurrentSession();
         });
 
-        socket.on('new-click', data => {
+        socket.on('new-click', function(data) {
             allClicks.unshift(data);
             renderAnalytics();
         });
 
-        socket.on('new-conversion', data => {
+        socket.on('new-conversion', function(data) {
             allConversions.unshift(data);
             renderAnalytics();
         });
 
         function renderAnalytics() {
-            const subIdSearch = document.getElementById('searchSubId').value.toLowerCase();
-            const convSearch = document.getElementById('searchConv').value.toLowerCase();
+            var subIdSearch = document.getElementById('searchSubId').value.toLowerCase();
+            var convSearch = document.getElementById('searchConv').value.toLowerCase();
 
-            const filteredClicks = allClicks.filter(c => {
-                const dt = new Date(c.isoDate);
+            var filteredClicks = allClicks.filter(function(c) {
+                var dt = new Date(c.isoDate);
                 if (filterStartDate && dt < filterStartDate) return false;
                 if (filterEndDate && dt > filterEndDate) return false;
                 return true;
             });
 
-            const filteredConversions = allConversions.filter(c => {
-                const dt = new Date(c.isoDate);
+            var filteredConversions = allConversions.filter(function(c) {
+                var dt = new Date(c.isoDate);
                 if (filterStartDate && dt < filterStartDate) return false;
                 if (filterEndDate && dt > filterEndDate) return false;
                 return true;
             });
 
-            const subIdStats = {};
-            const globalUniques = new Set();
-            let totalClicks = 0, totalConversions = 0, totalRevenue = 0;
+            var subIdStats = {};
+            var globalUniques = new Set();
+            var totalClicks = 0, totalConversions = 0, totalRevenue = 0;
 
-            filteredClicks.forEach(c => {
-                const sId = c.sub_id;
-                const country = c.country || 'Unknown';
-                const flag = c.flag || getFlagEmoji('XX');
+            filteredClicks.forEach(function(c) {
+                var sId = c.sub_id;
+                var country = c.country || 'Unknown';
+                var flag = c.flag || getFlagEmoji('XX');
 
                 if (!subIdStats[sId]) {
                     subIdStats[sId] = { clicks: 0, conversions: 0, revenue: 0, uniques: new Set(), countries: {} };
@@ -1116,10 +1125,10 @@ app.get('/', (req, res) => {
                 subIdStats[sId].countries[country].uniques.add(c.visitorKey);
             });
 
-            filteredConversions.forEach(c => {
-                const sId = c.sub_id;
-                const country = c.country || 'Unknown';
-                const flag = c.flag || getFlagEmoji('XX');
+            filteredConversions.forEach(function(c) {
+                var sId = c.sub_id;
+                var country = c.country || 'Unknown';
+                var flag = c.flag || getFlagEmoji('XX');
 
                 totalConversions++;
                 totalRevenue += c.amountVal;
@@ -1139,192 +1148,162 @@ app.get('/', (req, res) => {
                 subIdStats[sId].countries[country].revenue += c.amountVal;
             });
 
-            // SUB ID DENGAN REVENUE HIGHEST (PEMENANG MAHKOTA)
-            let topSubId = null;
-            let maxRevenue = 0;
-            Object.keys(subIdStats).forEach(sId => {
+            var topSubId = null;
+            var maxRevenue = 0;
+            Object.keys(subIdStats).forEach(function(sId) {
                 if (subIdStats[sId].revenue > maxRevenue && subIdStats[sId].revenue > 0) {
                     maxRevenue = subIdStats[sId].revenue;
                     topSubId = sId;
                 }
             });
 
-            // UPDATE CARDS STATISTIK
             document.getElementById('card-clicks').innerText = totalClicks;
             document.getElementById('card-uniques').innerText = globalUniques.size;
             document.getElementById('card-conversions').innerText = totalConversions;
             document.getElementById('card-revenue').innerText = '$' + totalRevenue.toFixed(2);
 
-            // RENDER TAB CONVERSION
-            const tbodyConv = document.getElementById('tbl-conv');
+            var tbodyConv = document.getElementById('tbl-conv');
             tbodyConv.innerHTML = '';
             
-            const searchedConversions = filteredConversions.filter(c => {
-                return c.sub_id.toLowerCase().includes(convSearch) ||
-                       c.country.toLowerCase().includes(convSearch);
+            var searchedConversions = filteredConversions.filter(function(c) {
+                return c.sub_id.toLowerCase().indexOf(convSearch) !== -1 ||
+                       c.country.toLowerCase().indexOf(convSearch) !== -1;
             });
 
             if (searchedConversions.length === 0) {
                 tbodyConv.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data konversi.</td></tr>';
             } else {
-                searchedConversions.forEach(c => {
-                    const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
-                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', osName: 'Desktop' };
-                    const isTop = (c.sub_id === topSubId);
+                searchedConversions.forEach(function(c) {
+                    var formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
+                    var dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', osName: 'Desktop' };
+                    var isTop = (c.sub_id === topSubId);
                     
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = \`
-                        <td>\${formattedTime}</td>
-                        <td>
-                            <span class="badge-subid">
-                                \${isTop ? '👑 ' : ''}\${c.sub_id}
-                            </span>
-                        </td>
-                        <td>\${c.flag || getFlagEmoji('XX')} \${c.country}</td>
-                        <td>
-                            <div class="device-badge">
-                                <i class="fa-brands \${dev.osIcon} \${dev.osClass || ''}"></i> \${dev.osName}
-                            </div>
-                        </td>
-                        <td><strong style="color:#10b981">\${c.amount}</strong></td>
-                    \`;
+                    var tr = document.createElement('tr');
+                    tr.innerHTML = '<td>' + formattedTime + '</td>' +
+                        '<td><span class="badge-subid">' + (isTop ? '👑 ' : '') + c.sub_id + '</span></td>' +
+                        '<td>' + (c.flag || getFlagEmoji('XX')) + ' ' + c.country + '</td>' +
+                        '<td><div class="device-badge"><i class="fa-brands ' + dev.osIcon + ' ' + (dev.osClass || '') + '"></i> ' + dev.osName + '</div></td>' +
+                        '<td><strong style="color:#10b981">' + c.amount + '</strong></td>';
                     tbodyConv.appendChild(tr);
                 });
             }
 
-            // RENDER TAB LIVE CLICK
-            const tbodyClick = document.getElementById('tbl-click');
+            var tbodyClick = document.getElementById('tbl-click');
             tbodyClick.innerHTML = '';
             
-            const limitedClicksForDisplay = allClicks.slice(0, 100);
+            var limitedClicksForDisplay = allClicks.slice(0, 100);
 
             if (limitedClicksForDisplay.length === 0) {
                 tbodyClick.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data klik.</td></tr>';
             } else {
-                limitedClicksForDisplay.forEach(c => {
-                    const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
-                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', browserType: 'globe', osName: 'Desktop', browserName: 'Browser' };
-                    const browserImgHtml = getBrowserIconHtml(dev.browserType || 'globe');
+                limitedClicksForDisplay.forEach(function(c) {
+                    var formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
+                    var dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', browserType: 'globe', osName: 'Desktop', browserName: 'Browser' };
+                    var browserImgHtml = getBrowserIconHtml(dev.browserType || 'globe');
 
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = \`
-                        <td>\${formattedTime}</td>
-                        <td><span class="badge-subid">\${c.sub_id}</span></td>
-                        <td><code>\${c.ip}</code></td>
-                        <td>\${c.flag || getFlagEmoji('XX')} \${c.country}</td>
-                        <td>
-                            <div class="device-badge">
-                                <i class="fa-brands \${dev.osIcon} \${dev.osClass || ''}"></i>
-                                \${browserImgHtml}
-                            </div>
-                        </td>
-                    \`;
+                    var tr = document.createElement('tr');
+                    tr.innerHTML = '<td>' + formattedTime + '</td>' +
+                        '<td><span class="badge-subid">' + c.sub_id + '</span></td>' +
+                        '<td><code>' + c.ip + '</code></td>' +
+                        '<td>' + (c.flag || getFlagEmoji('XX')) + ' ' + c.country + '</td>' +
+                        '<td><div class="device-badge"><i class="fa-brands ' + dev.osIcon + ' ' + (dev.osClass || '') + '"></i> ' + browserImgHtml + '</div></td>';
                     tbodyClick.appendChild(tr);
                 });
             }
 
-            // RENDER TOTAL PERFORMANCE PER SUB ID
-            const tbodySubId = document.getElementById('tbl-subid-body');
+            var tbodySubId = document.getElementById('tbl-subid-body');
             tbodySubId.innerHTML = '';
 
-            let subIdKeys = Object.keys(subIdStats).filter(key => key.toLowerCase().includes(subIdSearch));
+            var subIdKeys = Object.keys(subIdStats).filter(function(key) {
+                return key.toLowerCase().indexOf(subIdSearch) !== -1;
+            });
 
-            subIdKeys.sort((a, b) => subIdStats[b].revenue - subIdStats[a].revenue);
+            subIdKeys.sort(function(a, b) {
+                return subIdStats[b].revenue - subIdStats[a].revenue;
+            });
 
             if (subIdKeys.length === 0) {
                 tbodySubId.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #94a3b8;">Tidak ada data Sub ID.</td></tr>';
                 return;
             }
 
-            subIdKeys.forEach(subId => {
-                const item = subIdStats[subId];
-                const uCount = item.uniques.size;
-                const cr = uCount > 0 ? ((item.conversions / uCount) * 100).toFixed(2) : '0.00';
-                const isExpanded = expandedSubIds.has(subId);
-                const isTop = (subId === topSubId);
+            subIdKeys.forEach(function(subId) {
+                var item = subIdStats[subId];
+                var uCount = item.uniques.size;
+                var cr = uCount > 0 ? ((item.conversions / uCount) * 100).toFixed(2) : '0.00';
+                var isExpanded = expandedSubIds.has(subId);
+                var isTop = (subId === topSubId);
 
-                const tr = document.createElement('tr');
+                var tr = document.createElement('tr');
                 tr.className = 'clickable-row';
-                tr.onclick = () => toggleSubIdExpand(subId);
+                tr.onclick = function() { toggleSubIdExpand(subId); };
 
-                tr.innerHTML = \`
-                    <td>
-                        <span class="badge-subid">
-                            \${isTop ? '👑 ' : ''}\${subId}
-                        </span>
-                    </td>
-                    <td>\${item.clicks}</td>
-                    <td><strong style="color:#8b5cf6;">\${uCount}</strong></td>
-                    <td><strong>\${item.conversions}</strong></td>
-                    <td><strong style="color:#3b82f6;">\${cr}%</strong></td>
-                    <td><strong style="color:#10b981;">$\${item.revenue.toFixed(2)}</strong></td>
-                \`;
+                tr.innerHTML = '<td><span class="badge-subid">' + (isTop ? '👑 ' : '') + subId + '</span></td>' +
+                    '<td>' + item.clicks + '</td>' +
+                    '<td><strong style="color:#8b5cf6;">' + uCount + '</strong></td>' +
+                    '<td><strong>' + item.conversions + '</strong></td>' +
+                    '<td><strong style="color:#3b82f6;">' + cr + '%</strong></td>' +
+                    '<td><strong style="color:#10b981;">$' + item.revenue.toFixed(2) + '</strong></td>';
                 tbodySubId.appendChild(tr);
 
                 if (isExpanded) {
-                    const detailTr = document.createElement('tr');
-                    let countryKeys = Object.keys(item.countries);
+                    var detailTr = document.createElement('tr');
+                    var countryKeys = Object.keys(item.countries);
 
-                    countryKeys.sort((a, b) => {
-                        const revA = item.countries[a].revenue;
-                        const revB = item.countries[b].revenue;
+                    countryKeys.sort(function(a, b) {
+                        var revA = item.countries[a].revenue;
+                        var revB = item.countries[b].revenue;
                         if (revB !== revA) {
                             return revB - revA;
                         }
                         return item.countries[b].clicks - item.countries[a].clicks;
                     });
 
-                    let countryRowsHtml = '';
-                    countryKeys.forEach(cName => {
-                        const cData = item.countries[cName];
-                        const cUniques = cData.uniques.size;
-                        const cCr = cUniques > 0 ? ((cData.conversions / cUniques) * 100).toFixed(2) : '0.00';
+                    var countryRowsHtml = '';
+                    countryKeys.forEach(function(cName) {
+                        var cData = item.countries[cName];
+                        var cUniques = cData.uniques.size;
+                        var cCr = cUniques > 0 ? ((cData.conversions / cUniques) * 100).toFixed(2) : '0.00';
 
-                        countryRowsHtml += \`
-                            <tr>
-                                <td>\${cData.flag} \${cName}</td>
-                                <td>\${cData.clicks}</td>
-                                <td><strong style="color:#8b5cf6;">\${cUniques}</strong></td>
-                                <td><strong>\${cData.conversions}</strong></td>
-                                <td><strong style="color:#3b82f6;">\${cCr}%</strong></td>
-                                <td><strong style="color:#10b981;">$\${cData.revenue.toFixed(2)}</strong></td>
-                            </tr>
-                        \`;
+                        countryRowsHtml += '<tr>' +
+                            '<td>' + cData.flag + ' ' + cName + '</td>' +
+                            '<td>' + cData.clicks + '</td>' +
+                            '<td><strong style="color:#8b5cf6;">' + cUniques + '</strong></td>' +
+                            '<td><strong>' + cData.conversions + '</strong></td>' +
+                            '<td><strong style="color:#3b82f6;">' + cCr + '%</strong></td>' +
+                            '<td><strong style="color:#10b981;">$' + cData.revenue.toFixed(2) + '</strong></td>' +
+                        '</tr>';
                     });
 
-                    detailTr.innerHTML = \`
-                        <td colspan="6" style="padding:0;">
-                            <div class="country-detail-container">
-                                <div style="font-size:11px; font-weight:bold; color:#38bdf8; margin-bottom:4px;">
-                                    🌍 BREAKDOWN NEGARA UNTUK SUB ID: <span style="text-decoration:underline;">\${subId}</span>
-                                </div>
-                                <div class="table-responsive">
-                                    <table class="country-detail-table">
-                                        <thead>
-                                            <tr>
-                                                <th>Negara</th>
-                                                <th>Clicks</th>
-                                                <th>Uniques</th>
-                                                <th>Conversions</th>
-                                                <th>CR (%)</th>
-                                                <th>Revenue ($)</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            \${countryRowsHtml}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </td>
-                    \`;
+                    detailTr.innerHTML = '<td colspan="6" style="padding:0;">' +
+                        '<div class="country-detail-container">' +
+                            '<div style="font-size:11px; font-weight:bold; color:#38bdf8; margin-bottom:4px;">' +
+                                '🌍 BREAKDOWN NEGARA UNTUK SUB ID: <span style="text-decoration:underline;">' + subId + '</span>' +
+                            '</div>' +
+                            '<div class="table-responsive">' +
+                                '<table class="country-detail-table">' +
+                                    '<thead>' +
+                                        '<tr>' +
+                                            '<th>Negara</th>' +
+                                            '<th>Clicks</th>' +
+                                            '<th>Uniques</th>' +
+                                            '<th>Conversions</th>' +
+                                            '<th>CR (%)</th>' +
+                                            '<th>Revenue ($)</th>' +
+                                        '</tr>' +
+                                    '</thead>' +
+                                    '<tbody>' + countryRowsHtml + '</tbody>' +
+                                '</table>' +
+                            '</div>' +
+                        '</div>' +
+                    '</td>';
                     tbodySubId.appendChild(detailTr);
                 }
             });
         }
 
         function triggerClick() {
-            const subId = document.getElementById('sim-subid').value;
+            var subId = document.getElementById('sim-subid').value;
             fetch('/api/track-click', { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1333,7 +1312,7 @@ app.get('/', (req, res) => {
         }
 
         function triggerConv() {
-            const subId = document.getElementById('sim-subid').value;
+            var subId = document.getElementById('sim-subid').value;
             fetch('/api/track-conversion', { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1358,6 +1337,6 @@ app.get('/', (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-    console.log(`Server berjalan di port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server berjalan dengan sukses di port ${PORT}`);
 });
