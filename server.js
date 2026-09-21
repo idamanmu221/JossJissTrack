@@ -92,6 +92,7 @@ function getFlagEmoji(countryCode) {
     const code = countryCode.toLowerCase();
     return `<img src="https://flagcdn.com/24x18/${code}.png" class="flag-img" alt="${countryCode}">`;
 }
+
 function getDeviceIcons(uaOrReq) {
     let rawUa = '';
     if (uaOrReq && uaOrReq.headers && uaOrReq.headers['user-agent']) {
@@ -105,45 +106,58 @@ function getDeviceIcons(uaOrReq) {
     const uaLower = rawUa.toLowerCase();
 
     let osIcon = 'fa-desktop';
+    let osClass = 'os-desktop';
     let osName = 'Desktop';
 
     if (uaLower.includes('android')) {
         osIcon = 'fa-android';
+        osClass = 'os-android';
         osName = 'Android';
     } else if (uaLower.includes('iphone') || uaLower.includes('ipad') || uaLower.includes('ipod') || uaLower.includes('macintosh') || uaLower.includes('mac os')) {
         osIcon = 'fa-apple';
+        osClass = 'os-apple';
         osName = 'iOS / Mac';
     } else if (uaLower.includes('windows')) {
         osIcon = 'fa-windows';
+        osClass = 'os-windows';
         osName = 'Windows';
     } else if (uaLower.includes('linux') || uaLower.includes('cros')) {
         osIcon = 'fa-linux';
+        osClass = 'os-linux';
         osName = 'Linux';
     }
 
     let browserIcon = 'fa-globe';
+    let browserClass = 'browser-globe';
     let browserName = 'Browser';
 
     if (uaLower.includes('edg/') || uaLower.includes('edge')) {
         browserIcon = 'fa-edge';
+        browserClass = 'browser-edge';
         browserName = 'Edge';
     } else if (uaLower.includes('opr/') || uaLower.includes('opera')) {
         browserIcon = 'fa-opera';
+        browserClass = 'browser-opera';
         browserName = 'Opera';
     } else if (uaLower.includes('samsungbrowser')) {
         browserIcon = 'fa-globe';
+        browserClass = 'browser-samsung';
         browserName = 'Samsung Internet';
     } else if (uaLower.includes('firefox') || uaLower.includes('fxios')) {
         browserIcon = 'fa-firefox-browser';
+        browserClass = 'browser-firefox';
         browserName = 'Firefox';
     } else if (uaLower.includes('chrome') || uaLower.includes('crios')) {
         browserIcon = 'fa-chrome';
+        browserClass = 'browser-chrome';
         browserName = 'Chrome';
     } else if (uaLower.includes('safari') && !uaLower.includes('chrome')) {
         browserIcon = 'fa-safari';
+        browserClass = 'browser-safari';
         browserName = 'Safari';
     } else if (uaLower.includes('trident') || uaLower.includes('msie')) {
         browserIcon = 'fa-internet-explorer';
+        browserClass = 'browser-ie';
         browserName = 'IE';
     }
 
@@ -151,23 +165,36 @@ function getDeviceIcons(uaOrReq) {
         browserName: browserName,
         osName: osName,
         browserIcon: browserIcon,
-        osIcon: osIcon
+        browserClass: browserClass,
+        osIcon: osIcon,
+        osClass: osClass
     };
 }
 
 function getOsIconFromPostback(osStr) {
-    if (!osStr) return { osName: 'Unknown', osIcon: 'fa-desktop' };
+    if (!osStr) return { osName: 'Unknown', osIcon: 'fa-desktop', osClass: 'os-desktop' };
     const cleanOs = osStr.trim().toLowerCase();
 
     let icon = 'fa-desktop';
-    if (cleanOs.includes('android')) icon = 'fa-android';
-    else if (cleanOs.includes('ios') || cleanOs.includes('mac') || cleanOs.includes('iphone') || cleanOs.includes('ipad')) icon = 'fa-apple';
-    else if (cleanOs.includes('windows')) icon = 'fa-windows';
-    else if (cleanOs.includes('linux')) icon = 'fa-linux';
+    let osClass = 'os-desktop';
+    if (cleanOs.includes('android')) {
+        icon = 'fa-android';
+        osClass = 'os-android';
+    } else if (cleanOs.includes('ios') || cleanOs.includes('mac') || cleanOs.includes('iphone') || cleanOs.includes('ipad')) {
+        icon = 'fa-apple';
+        osClass = 'os-apple';
+    } else if (cleanOs.includes('windows')) {
+        icon = 'fa-windows';
+        osClass = 'os-windows';
+    } else if (cleanOs.includes('linux')) {
+        icon = 'fa-linux';
+        osClass = 'os-linux';
+    }
 
     return {
         osName: toTitleCase(osStr),
-        osIcon: icon
+        osIcon: icon,
+        osClass: osClass
     };
 }
 
@@ -180,7 +207,7 @@ async function getGeoLocation(ip) {
     }
 
     if (!ip || ip === '127.0.0.1' || ip === '::1' || ip.startsWith('192.168') || ip.startsWith('10.')) {
-        return { country: 'Indonesia (Local)', countryCode: 'ID', flag: '🇮🇩', ip: '127.0.0.1' };
+        return { country: 'Indonesia (Local)', countryCode: 'ID', flag: getFlagEmoji('ID'), ip: '127.0.0.1' };
     }
 
     try {
@@ -201,7 +228,7 @@ async function getGeoLocation(ip) {
         } catch (e) {}
     }
 
-    return { country: 'Unknown', countryCode: 'XX', flag: '🌐', ip: ip };
+    return { country: 'Unknown', countryCode: 'XX', flag: getFlagEmoji('XX'), ip: ip };
 }
 
 // Endpoint Tracking & Redirection Klik
@@ -303,7 +330,7 @@ async function processConversion(req, res) {
 
     const rawCountry = req.query.country || req.body.country;
     let countryName = 'Unknown';
-    let flagEmoji = '🌐';
+    let flagEmoji = getFlagEmoji('XX');
 
     if (rawCountry && rawCountry.trim() !== '' && rawCountry !== '{country}') {
         const cleanedCountry = rawCountry.trim().toUpperCase();
@@ -317,12 +344,12 @@ async function processConversion(req, res) {
             countryName = toTitleCase(rawCountry.trim());
         } else {
             countryName = toTitleCase(rawCountry.trim());
-            flagEmoji = '🌐';
+            flagEmoji = getFlagEmoji('XX');
         }
     }
 
     const rawOs = req.query.os || req.body.os;
-    let devInfo = { osName: 'Desktop', osIcon: 'fa-desktop' };
+    let devInfo = { osName: 'Desktop', osIcon: 'fa-desktop', osClass: 'os-desktop' };
 
     if (rawOs && rawOs.trim() !== '' && rawOs !== '{os}') {
         devInfo = getOsIconFromPostback(rawOs);
@@ -554,12 +581,39 @@ app.get('/', (req, res) => {
         tr.clickable-row:hover { background: var(--sub-panel-bg); }
 
         .badge-subid { background: var(--badge-bg); color: var(--badge-text); padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
-        .flag-icon { font-size: 16px; margin-right: 4px; vertical-align: middle; }
         
-        .device-badge {
-            display: inline-flex; align-items: center; gap: 4px;
-            background: var(--sub-panel-bg); padding: 3px 6px; border-radius: 4px; font-size: 11px; color: var(--text-color);
+        .flag-img {
+            width: 18px;
+            height: 13px;
+            object-fit: cover;
+            border-radius: 2px;
+            vertical-align: middle;
+            margin-right: 5px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
         }
+
+        .device-badge {
+            display: inline-flex; align-items: center; gap: 6px;
+            background: var(--sub-panel-bg); padding: 4px 8px; border-radius: 4px; font-size: 12px; color: var(--text-color);
+        }
+
+        /* WARNA IKON BRAND OS */
+        .os-android { color: #3ddc84; }
+        .os-apple { color: #a2aaad; }
+        [data-theme="dark"] .os-apple { color: #ffffff; }
+        .os-windows { color: #0078d4; }
+        .os-linux { color: #f29100; }
+        .os-desktop { color: #64748b; }
+
+        /* WARNA IKON BRAND BROWSER */
+        .browser-chrome { color: #ea4335; }
+        .browser-firefox { color: #ff7139; }
+        .browser-safari { color: #0066cc; }
+        .browser-edge { color: #0078d4; }
+        .browser-opera { color: #ff1b2d; }
+        .browser-samsung { color: #1428a0; }
+        .browser-ie { color: #00a4ef; }
+        .browser-globe { color: #64748b; }
 
         .country-detail-container {
             background: var(--row-expand-bg); padding: 10px 15px; border-radius: 6px; margin: 4px 0; border: 1px solid var(--border-color);
@@ -573,17 +627,7 @@ app.get('/', (req, res) => {
         .country-detail-table td {
             padding: 6px 8px; border-bottom: 1px dashed var(--border-color);
         }
-        
-        .flag-img {
-            width: 18px;
-            height: 13px;
-            object-fit: cover;
-            border-radius: 2px;
-            vertical-align: middle;
-            margin-right: 5px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        }
-        
+
         .hidden { display: none !important; }
     </style>
 </head>
@@ -1031,7 +1075,7 @@ app.get('/', (req, res) => {
             filteredClicks.forEach(c => {
                 const sId = c.sub_id;
                 const country = c.country || 'Unknown';
-                const flag = c.flag || '🌐';
+                const flag = c.flag || getFlagEmoji('XX');
 
                 if (!subIdStats[sId]) {
                     subIdStats[sId] = { clicks: 0, conversions: 0, revenue: 0, uniques: new Set(), countries: {} };
@@ -1054,7 +1098,7 @@ app.get('/', (req, res) => {
             filteredConversions.forEach(c => {
                 const sId = c.sub_id;
                 const country = c.country || 'Unknown';
-                const flag = c.flag || '🌐';
+                const flag = c.flag || getFlagEmoji('XX');
 
                 totalConversions++;
                 totalRevenue += c.amountVal;
@@ -1090,7 +1134,7 @@ app.get('/', (req, res) => {
             document.getElementById('card-conversions').innerText = totalConversions;
             document.getElementById('card-revenue').innerText = '$' + totalRevenue.toFixed(2);
 
-            // RENDER TAB CONVERSION (ADA MAHKOTA DI SUB ID PEMENANG REVENUE TERBESAR)
+            // RENDER TAB CONVERSION
             const tbodyConv = document.getElementById('tbl-conv');
             tbodyConv.innerHTML = '';
             
@@ -1104,7 +1148,7 @@ app.get('/', (req, res) => {
             } else {
                 searchedConversions.forEach(c => {
                     const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
-                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', osName: 'Desktop' };
+                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', osName: 'Desktop' };
                     const isTop = (c.sub_id === topSubId);
                     
                     const tr = document.createElement('tr');
@@ -1115,10 +1159,10 @@ app.get('/', (req, res) => {
                                 \${isTop ? '👑 ' : ''}\${c.sub_id}
                             </span>
                         </td>
-                        <td><span class="flag-icon">\${c.flag || '🌐'}</span> \${c.country}</td>
+                        <td>\${c.flag || getFlagEmoji('XX')} \${c.country}</td>
                         <td>
                             <div class="device-badge">
-                                <i class="fa-brands \${dev.osIcon}"></i> \${dev.osName}
+                                <i class="fa-brands \${dev.osIcon} \${dev.osClass || ''}"></i> \${dev.osName}
                             </div>
                         </td>
                         <td><strong style="color:#10b981">\${c.amount}</strong></td>
@@ -1127,7 +1171,7 @@ app.get('/', (req, res) => {
                 });
             }
 
-            // RENDER TAB LIVE CLICK (100 KLIK TERBARU TANPA FILTER DENGAN TAMPILAN POLOS)
+            // RENDER TAB LIVE CLICK
             const tbodyClick = document.getElementById('tbl-click');
             tbodyClick.innerHTML = '';
             
@@ -1138,18 +1182,18 @@ app.get('/', (req, res) => {
             } else {
                 limitedClicksForDisplay.forEach(c => {
                     const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
-                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', browserIcon: 'fa-globe', osName: 'Desktop', browserName: 'Browser' };
+                    const dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', browserIcon: 'fa-globe', browserClass: 'browser-globe', osName: 'Desktop', browserName: 'Browser' };
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = \`
                         <td>\${formattedTime}</td>
                         <td><span class="badge-subid">\${c.sub_id}</span></td>
                         <td><code>\${c.ip}</code></td>
-                        <td><span class="flag-icon">\${c.flag || '🌐'}</span> \${c.country}</td>
+                        <td>\${c.flag || getFlagEmoji('XX')} \${c.country}</td>
                         <td>
                             <div class="device-badge">
-                                <i class="fa-brands \${dev.osIcon}"></i>
-                                <i class="fa-brands \${dev.browserIcon}"></i>
+                                <i class="fa-brands \${dev.osIcon} \${dev.osClass || ''}"></i>
+                                <i class="fa-brands \${dev.browserIcon} \${dev.browserClass || ''}"></i>
                             </div>
                         </td>
                     \`;
@@ -1199,7 +1243,6 @@ app.get('/', (req, res) => {
                     const detailTr = document.createElement('tr');
                     let countryKeys = Object.keys(item.countries);
 
-                    // PENGURUTAN DETAIL NEGARA: REVENUE TERBESAR, JIKA 0 URUTKAN DARI KLIK TERBANYAK
                     countryKeys.sort((a, b) => {
                         const revA = item.countries[a].revenue;
                         const revB = item.countries[b].revenue;
@@ -1217,7 +1260,7 @@ app.get('/', (req, res) => {
 
                         countryRowsHtml += \`
                             <tr>
-                                <td><span class="flag-icon">\${cData.flag}</span> \${cName}</td>
+                                <td>\${cData.flag} \${cName}</td>
                                 <td>\${cData.clicks}</td>
                                 <td><strong style="color:#8b5cf6;">\${cUniques}</strong></td>
                                 <td><strong>\${cData.conversions}</strong></td>
