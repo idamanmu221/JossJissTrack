@@ -588,15 +588,13 @@ app.get('/', (req, res) => {
             background: var(--sub-panel-bg); padding: 4px 8px; border-radius: 4px; font-size: 12px; color: var(--text-color);
         }
 
-        /* SVG BROWSER PROPORSI Sempurna */
-        .browser-svg {
-            width: 16px;
-            height: 16px;
-            min-width: 16px;
-            min-height: 16px;
+        /* GAMBAR BROWSER RESMI CDN - PRESISI & PROPORSIONAL */
+        .browser-img {
+            width: 15px;
+            height: 15px;
+            object-fit: contain;
             vertical-align: middle;
             display: inline-block;
-            flex-shrink: 0;
         }
 
         /* WARNA IKON BRAND OS */
@@ -783,26 +781,35 @@ app.get('/', (req, res) => {
         let userRole = localStorage.getItem('user_role') || null;
         let expandedSubIds = new Set();
 
-        // IKON SVG RESMI MULTI-WARNA UNTUK SEMUA BROWSER
-        function getBrowserSvg(type) {
+        // MENAMPILKAN IKON GAMBAR LOGO BROWSER DARI CDN RESMI
+        function getBrowserIconHtml(type) {
+            let url = '';
             switch(type) {
                 case 'chrome':
-                    return \`<svg class="browser-svg" viewBox="0 0 192 192"><circle cx="96" cy="96" r="36" fill="#1a73e8"/><path fill="#ea4335" d="M162.7 65.4A72 72 0 0 0 96 24V96h66.7z"/><path fill="#fbbc04" d="M96 168a72 72 0 0 0 62.3-36l-31.1-53.9L96 168z"/><path fill="#34a853" d="M29.3 132a72 72 0 0 0 66.7 36V96H29.3z"/><path fill="#ea4335" d="M96 24A72 72 0 0 0 29.3 65.4l31.2 53.9L96 24z"/></svg>\`;
+                    url = 'https://cdnjs.cloudflare.com/ajax/libs/browser-logos/74.0.0/chrome/chrome_24x24.png';
+                    break;
                 case 'firefox':
-                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><path fill="#ff9500" d="M16 2A14 14 0 1 0 30 16 14 14 0 0 0 16 2zm8 10a10 10 0 1 1-10-10 10 10 0 0 1 10 10z"/><path fill="#ff1b2d" d="M22 10a8 8 0 1 0-8 8 8 8 0 0 0 8-8z"/><path fill="#30b3ff" d="M16 12a4 4 0 1 0 4 4 4 4 0 0 0-4-4z"/></svg>\`;
+                    url = 'https://cdnjs.cloudflare.com/ajax/libs/browser-logos/74.0.0/firefox/firefox_24x24.png';
+                    break;
                 case 'edge':
-                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><path fill="#0078d4" d="M16 2A14 14 0 0 0 2 16a14 14 0 0 0 21 12l-6-11h9a14 14 0 0 0-10-15z"/><path fill="#50e6ff" d="M16 30a14 14 0 0 0 12-7l-7-4a6 6 0 1 1-5-9l-6 11a14 14 0 0 0 6 9z"/></svg>\`;
+                    url = 'https://cdnjs.cloudflare.com/ajax/libs/browser-logos/74.0.0/edge/edge_24x24.png';
+                    break;
                 case 'safari':
-                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="#0066cc"/><path fill="#ffffff" d="M16 4a12 12 0 1 0 12 12A12 12 0 0 0 16 4zm0 2a10 10 0 1 1-10 10A10 10 0 0 1 16 6z"/><polygon fill="#ff3b30" points="16,16 22,10 18,18"/><polygon fill="#e5e5ea" points="16,16 10,22 14,14"/></svg>\`;
+                    url = 'https://cdnjs.cloudflare.com/ajax/libs/browser-logos/74.0.0/safari/safari_24x24.png';
+                    break;
                 case 'opera':
-                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><path fill="#ff1b2d" d="M16 2C8.3 2 2 8.3 2 16s6.3 14 14 14 14-6.3 14-14S23.7 2 16 2zm0 22c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8z"/><ellipse cx="16" cy="16" rx="4" ry="8" fill="#ffffff"/></svg>\`;
+                    url = 'https://cdnjs.cloudflare.com/ajax/libs/browser-logos/74.0.0/opera/opera_24x24.png';
+                    break;
                 case 'samsung':
-                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="#1428a0"/><path fill="#ffffff" d="M8 16c0-3.3 3.6-6 8-6s8 2.7 8 6-3.6 6-8 6-8-2.7-8-6z"/></svg>\`;
+                    url = 'https://cdnjs.cloudflare.com/ajax/libs/browser-logos/74.0.0/samsung-internet/samsung-internet_24x24.png';
+                    break;
                 case 'ie':
-                    return \`<svg class="browser-svg" viewBox="0 0 32 32"><path fill="#00a4ef" d="M16 2A14 14 0 1 0 30 16 14 14 0 0 0 16 2zm2 20h-4v-8h4v8zm0-10h-4V8h4v4z"/><path fill="#ffb900" d="M6 14c1.5-4 5.5-7 10-7 6.6 0 12 4 12 10 0 1.5-.3 3-.8 4L6 14z" opacity="0.85"/></svg>\`;
+                    url = 'https://cdnjs.cloudflare.com/ajax/libs/browser-logos/74.0.0/archive/internet-explorer_9-11/internet-explorer_9-11_24x24.png';
+                    break;
                 default:
-                    return \`<i class="fa-solid fa-globe" style="font-size:14px; color:#64748b;"></i>\`;
+                    return '<i class="fa-solid fa-globe" style="font-size:14px; color:#64748b;"></i>';
             }
+            return `<img src="${url}" class="browser-img" alt="${type}">`;
         }
 
         function checkSession() {
@@ -1197,7 +1204,7 @@ app.get('/', (req, res) => {
                 limitedClicksForDisplay.forEach(c => {
                     const formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
                     const dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', browserType: 'globe', osName: 'Desktop', browserName: 'Browser' };
-                    const browserSvg = getBrowserSvg(dev.browserType || 'globe');
+                    const browserImgHtml = getBrowserIconHtml(dev.browserType || 'globe');
 
                     const tr = document.createElement('tr');
                     tr.innerHTML = \`
@@ -1208,7 +1215,7 @@ app.get('/', (req, res) => {
                         <td>
                             <div class="device-badge">
                                 <i class="fa-brands \${dev.osIcon} \${dev.osClass || ''}"></i>
-                                \${browserSvg}
+                                \${browserImgHtml}
                             </div>
                         </td>
                     \`;
