@@ -130,7 +130,17 @@ function getDeviceIcons(uaOrReq) {
     let browserType = 'globe';
     let browserName = 'Browser';
 
-    if (uaLower.includes('edg/') || uaLower.includes('edge')) {
+    // DETEKSI IN-APP BROWSER (FACEBOOK, INSTAGRAM, THREADS) DAHULUKAN
+    if (uaLower.includes('barcelona')) {
+        browserType = 'threads';
+        browserName = 'Threads';
+    } else if (uaLower.includes('instagram')) {
+        browserType = 'instagram';
+        browserName = 'Instagram';
+    } else if (uaLower.includes('fban') || uaLower.includes('fbav')) {
+        browserType = 'facebook';
+        browserName = 'Facebook';
+    } else if (uaLower.includes('edg/') || uaLower.includes('edge')) {
         browserType = 'edge';
         browserName = 'Edge';
     } else if (uaLower.includes('opr/') || uaLower.includes('opera')) {
@@ -793,6 +803,12 @@ app.get('/', (req, res) => {
         function getBrowserIconHtml(type) {
             var url = '';
             switch(type) {
+                case 'facebook':
+                    return '<i class="fa-brands fa-facebook" style="font-size:15px; color:#1877f2;"></i>';
+                case 'instagram':
+                    return '<i class="fa-brands fa-instagram" style="font-size:15px; color:#e4405f;"></i>';
+                case 'threads':
+                    return '<i class="fa-brands fa-threads" style="font-size:15px; color:#000000;"></i>';
                 case 'chrome':
                     url = 'https://cdnjs.cloudflare.com/ajax/libs/browser-logos/74.0.0/chrome/chrome_24x24.png';
                     break;
