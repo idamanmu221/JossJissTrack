@@ -37,6 +37,7 @@ const ClickSchema = new mongoose.Schema({
     ip: String,
     country: String,
     flag: String,
+    referrer: { type: String, default: 'Direct / Unknown' },
     deviceInfo: Object,
     visitorKey: String,
     type: { type: String, default: 'click' }
@@ -91,6 +92,17 @@ function getFlagEmoji(countryCode) {
     }
     const code = countryCode.toLowerCase();
     return `<img src="https://flagcdn.com/24x18/${code}.png" class="flag-img" alt="${countryCode}">`;
+}
+
+function parseReferrer(req) {
+    const ref = req.headers['referer'] || req.headers['referrer'] || '';
+    if (!ref) return 'Direct / None';
+    try {
+        const url = new URL(ref);
+        return url.hostname.replace('www.', '');
+    } catch (e) {
+        return ref.substring(0, 30);
+    }
 }
 
 function getDeviceIcons(uaOrReq) {
@@ -239,6 +251,7 @@ app.get('/click', async (req, res) => {
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const geo = await getGeoLocation(clientIp);
     const deviceInfo = getDeviceIcons(req);
+    const referrerStr = parseReferrer(req);
     const now = new Date();
 
     const userAgentSource = req.headers['user-agent'] || (req.useragent ? req.useragent.source : '');
@@ -250,6 +263,7 @@ app.get('/click', async (req, res) => {
         ip: geo.ip,
         country: geo.country,
         flag: geo.flag,
+        referrer: referrerStr,
         deviceInfo: deviceInfo,
         visitorKey: `${geo.ip}_${userAgentSource}`,
         type: 'click'
@@ -299,6 +313,7 @@ app.post('/api/track-click', async (req, res) => {
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
     const geo = await getGeoLocation(clientIp);
     const deviceInfo = getDeviceIcons(req);
+    const referrerStr = parseReferrer(req);
     const now = new Date();
 
     const userAgentSource = req.headers['user-agent'] || (req.useragent ? req.useragent.source : '');
@@ -310,6 +325,7 @@ app.post('/api/track-click', async (req, res) => {
         ip: geo.ip,
         country: geo.country,
         flag: geo.flag,
+        referrer: referrerStr,
         deviceInfo: deviceInfo,
         visitorKey: `${geo.ip}_${userAgentSource}`,
         type: 'click'
@@ -594,6 +610,8 @@ app.get('/', (req, res) => {
 
         .badge-subid { background: var(--badge-bg); color: var(--badge-text); padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
         
+        .badge-referrer { background: var(--sub-panel-bg); border: 1px solid var(--border-color); color: var(--text-color); padding: 2px 6px; border-radius: 4px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; font-family: monospace; }
+
         .flag-img {
             width: 18px;
             height: 13px;
@@ -780,7 +798,7 @@ app.get('/', (req, res) => {
             <div class="table-responsive">
                 <table>
                     <thead>
-                        <tr><th class="th-time">Waktu</th><th>Sub ID</th><th>IP</th><th>Negara</th><th>Perangkat</th></tr>
+                        <tr><th class="th-time">Waktu</th><th>Sub ID</th><th>IP</th><th>Negara</th><th>Referrer (Asal Link)</th><th>Perangkat</th></tr>
                     </thead>
                     <tbody id="tbl-click"></tbody>
                 </table>
@@ -1210,18 +1228,20 @@ app.get('/', (req, res) => {
             var limitedClicksForDisplay = allClicks.slice(0, 100);
 
             if (limitedClicksForDisplay.length === 0) {
-                tbodyClick.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8;">Tidak ada data klik.</td></tr>';
+                tbodyClick.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #94a3b8;">Tidak ada data klik.</td></tr>';
             } else {
                 limitedClicksForDisplay.forEach(function(c) {
                     var formattedTime = formatDateTimeByOffset(c.isoDate, selectedTimezoneOffset);
                     var dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', browserType: 'globe', osName: 'Desktop', browserName: 'Browser' };
                     var browserImgHtml = getBrowserIconHtml(dev.browserType || 'globe');
+                    var refText = c.referrer || 'Direct / None';
 
                     var tr = document.createElement('tr');
                     tr.innerHTML = '<td>' + formattedTime + '</td>' +
                         '<td><span class="badge-subid">' + c.sub_id + '</span></td>' +
                         '<td><code>' + c.ip + '</code></td>' +
                         '<td>' + (c.flag || getFlagEmoji('XX')) + ' ' + c.country + '</td>' +
+                        '<td><span class="badge-referrer">' + refText + '</span></td>' +
                         '<td><div class="device-badge"><i class="fa-brands ' + dev.osIcon + ' ' + (dev.osClass || '') + '"></i> ' + browserImgHtml + '</div></td>';
                     tbodyClick.appendChild(tr);
                 });
