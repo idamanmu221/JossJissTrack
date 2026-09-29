@@ -26,7 +26,10 @@ const PASSWORDS = {
 
 // CONNECT TO MONGODB ATLAS (DENGAN SAFE ERROR HANDLING)
 mongoose.connect(MONGODB_URI)
-    .then(() => console.log('[DB] Terhubung secara permanen ke MongoDB Atlas!'))
+    .then(() => {
+        console.log('[DB] Terhubung secara permanen ke MongoDB Atlas!');
+        initSettings();
+    })
     .catch(err => console.error('[DB] Gagal terhubung ke MongoDB:', err.message));
 
 // SCHEMA DATABASE
@@ -36,11 +39,13 @@ const ClickSchema = new mongoose.Schema({
     sub_id: String,
     ip: String,
     country: String,
+    countryCode: String,
     flag: String,
-    referrer: { type: String, default: 'Direct / Unknown' },
+    referrer: { type: String, default: 'Direct / None' },
     deviceInfo: Object,
     visitorKey: String,
-    type: { type: String, default: 'click' }
+    type: { type: String, default: 'click' },
+    isBlocked: { type: Boolean, default: false }
 });
 
 const ConversionSchema = new mongoose.Schema({
@@ -54,8 +59,35 @@ const ConversionSchema = new mongoose.Schema({
     amount: String
 });
 
+const SettingsSchema = new mongoose.Schema({
+    key: { type: String, unique: true, default: 'geo_settings' },
+    blockedCountries: { type: Array, default: ['ID'] },
+    redirectUrl: { type: String, default: 'https://google.com' }
+});
+
 const ClickModel = mongoose.model('Click', ClickSchema);
 const ConversionModel = mongoose.model('Conversion', ConversionSchema);
+const SettingsModel = mongoose.model('Settings', SettingsSchema);
+
+// RUNTIME CACHE UNTUK BLOKIR NEGARA
+let currentSettings = {
+    blockedCountries: ['ID'],
+    redirectUrl: 'https://google.com'
+};
+
+async function initSettings() {
+    try {
+        let set = await SettingsModel.findOne({ key: 'geo_settings' });
+        if (!set) {
+            set = await SettingsModel.create({ key: 'geo_settings', blockedCountries: ['ID'], redirectUrl: 'https://google.com' });
+        }
+        currentSettings.blockedCountries = set.blockedCountries || ['ID'];
+        currentSettings.redirectUrl = set.redirectUrl || 'https://google.com';
+        console.log('[GEO-SETTINGS] Settings Loaded:', currentSettings);
+    } catch (e) {
+        console.error('[GEO-SETTINGS] Error loading settings:', e.message);
+    }
+}
 
 // KAMUS PEMETAAN NAMA NEGARA LENGKAP KE KODE ISO 2-LETTER
 const COUNTRY_MAP = {
@@ -142,7 +174,6 @@ function getDeviceIcons(uaOrReq) {
     let browserType = 'globe';
     let browserName = 'Browser';
 
-    // DETEKSI IN-APP BROWSER (FACEBOOK, INSTAGRAM, THREADS) DAHULUKAN
     if (uaLower.includes('barcelona')) {
         browserType = 'threads';
         browserName = 'Threads';
@@ -226,7 +257,7 @@ async function getGeoLocation(ip) {
     try {
         const res = await axios.get(`https://ipapi.co/${ip}/json/`, { timeout: 3000 });
         if (res.data && res.data.country_code && res.data.country_code !== 'UNDEFINED') {
-            const countryCode = res.data.country_code;
+            const countryCode = res.data.country_code.toUpperCase();
             const countryName = res.data.country_name || 'Unknown';
             const flag = getFlagEmoji(countryCode);
             return { country: countryName, countryCode: countryCode, flag: flag, ip: ip };
@@ -235,8 +266,9 @@ async function getGeoLocation(ip) {
         try {
             const fallbackRes = await axios.get(`http://ip-api.com/json/${ip}`, { timeout: 3000 });
             if (fallbackRes.data && fallbackRes.data.status === 'success') {
-                const flag = getFlagEmoji(fallbackRes.data.countryCode);
-                return { country: fallbackRes.data.country, countryCode: fallbackRes.data.countryCode, flag: flag, ip: ip };
+                const countryCode = fallbackRes.data.countryCode.toUpperCase();
+                const flag = getFlagEmoji(countryCode);
+                return { country: fallbackRes.data.country, countryCode: countryCode, flag: flag, ip: ip };
             }
         } catch (e) {}
     }
@@ -256,17 +288,22 @@ app.get('/click', async (req, res) => {
 
     const userAgentSource = req.headers['user-agent'] || (req.useragent ? req.useragent.source : '');
 
+    // CHECK APAKAH NEGARA DIBLOKIR
+    const isBlocked = currentSettings.blockedCountries.includes(geo.countryCode);
+
     const clickObj = {
         id: Date.now() + Math.random(),
         isoDate: now.toISOString(),
         sub_id: subId,
         ip: geo.ip,
         country: geo.country,
+        countryCode: geo.countryCode,
         flag: geo.flag,
         referrer: referrerStr,
         deviceInfo: deviceInfo,
         visitorKey: `${geo.ip}_${userAgentSource}`,
-        type: 'click'
+        type: 'click',
+        isBlocked: isBlocked
     };
 
     try {
@@ -275,10 +312,51 @@ app.get('/click', async (req, res) => {
     
     io.emit('new-click', clickObj);
 
+    // BILA DIBLOKIR, REDIRECT KE WEBSITE LAIN
+    if (isBlocked) {
+        console.log(`[GEO-BLOCK] Clicks from ${geo.country} (${geo.countryCode}) blocked -> Redirected to ${currentSettings.redirectUrl}`);
+        return res.redirect(currentSettings.redirectUrl);
+    }
+
+    // JIKA TIDAK DIBLOKIR, LANJUT KE SMARTLINK
     const encodedSubId = encodeURIComponent(subId);
     const destinationUrl = `${IMONETIZEIT_BASE_URL}&s3=${encodedSubId}&s5=${encodedSubId}&click_id=${encodedSubId}`;
 
     res.redirect(destinationUrl);
+});
+
+// API ADMIN - GEOLOCATION SETTINGS
+app.get('/api/geo-settings', (req, res) => {
+    res.json(currentSettings);
+});
+
+app.post('/api/geo-settings', async (req, res) => {
+    try {
+        const { blockedCountries, redirectUrl } = req.body;
+        
+        let parsedCountries = [];
+        if (typeof blockedCountries === 'string') {
+            parsedCountries = blockedCountries.split(',').map(c => c.trim().toUpperCase()).filter(c => c.length > 0);
+        } else if (Array.isArray(blockedCountries)) {
+            parsedCountries = blockedCountries.map(c => String(c).trim().toUpperCase()).filter(c => c.length > 0);
+        }
+
+        const validRedirectUrl = (redirectUrl && redirectUrl.trim() !== '') ? redirectUrl.trim() : 'https://google.com';
+
+        currentSettings.blockedCountries = parsedCountries;
+        currentSettings.redirectUrl = validRedirectUrl;
+
+        await SettingsModel.findOneAndUpdate(
+            { key: 'geo_settings' },
+            { blockedCountries: parsedCountries, redirectUrl: validRedirectUrl },
+            { upsert: true, new: true }
+        );
+
+        console.log('[GEO-SETTINGS] Updated:', currentSettings);
+        res.json({ status: 'ok', message: 'Pengaturan blokir negara berhasil disimpan!', settings: currentSettings });
+    } catch (err) {
+        res.status(500).json({ status: 'error', message: err.message });
+    }
 });
 
 // Endpoint Verifikasi Login
@@ -302,7 +380,7 @@ app.get('/api/initial-data', async (req, res) => {
     try {
         const clicksHistory = await ClickModel.find().sort({ _id: -1 }).limit(5000);
         const conversionsHistory = await ConversionModel.find().sort({ _id: -1 }).limit(5000);
-        res.json({ clicksHistory, conversionsHistory });
+        res.json({ clicksHistory, conversionsHistory, settings: currentSettings });
     } catch (err) {
         res.status(500).json({ error: 'Gagal mengambil data' });
     }
@@ -317,6 +395,7 @@ app.post('/api/track-click', async (req, res) => {
     const now = new Date();
 
     const userAgentSource = req.headers['user-agent'] || (req.useragent ? req.useragent.source : '');
+    const isBlocked = currentSettings.blockedCountries.includes(geo.countryCode);
 
     const clickObj = {
         id: Date.now() + Math.random(),
@@ -324,11 +403,13 @@ app.post('/api/track-click', async (req, res) => {
         sub_id: subId,
         ip: geo.ip,
         country: geo.country,
+        countryCode: geo.countryCode,
         flag: geo.flag,
         referrer: referrerStr,
         deviceInfo: deviceInfo,
         visitorKey: `${geo.ip}_${userAgentSource}`,
-        type: 'click'
+        type: 'click',
+        isBlocked: isBlocked
     };
 
     try {
@@ -336,7 +417,7 @@ app.post('/api/track-click', async (req, res) => {
     } catch (e) {}
     
     io.emit('new-click', clickObj);
-    res.json({ status: 'ok' });
+    res.json({ status: 'ok', isBlocked: isBlocked });
 });
 
 // FUNGSI PROSES KONVERSI POSTBACK
@@ -552,6 +633,7 @@ app.get('/', (req, res) => {
             display: none; position: fixed; top: 55px; left: 10px; right: 10px; max-width: 360px;
             background: #0f172a; border-radius: 8px; padding: 15px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 9999; color: white; border: 1px solid #334155;
+            max-height: 85vh; overflow-y: auto;
         }
         .menu-dropdown.show { display: block !important; }
         .menu-dropdown button.menu-item { 
@@ -609,8 +691,8 @@ app.get('/', (req, res) => {
         tr.clickable-row:hover { background: var(--sub-panel-bg); }
 
         .badge-subid { background: var(--badge-bg); color: var(--badge-text); padding: 3px 6px; border-radius: 4px; font-weight: bold; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; }
-        
         .badge-referrer { background: var(--sub-panel-bg); border: 1px solid var(--border-color); color: var(--text-color); padding: 2px 6px; border-radius: 4px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; font-family: monospace; }
+        .badge-blocked { background: #fee2e2; color: #ef4444; border: 1px solid #fca5a5; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 5px; }
 
         .flag-img {
             width: 18px;
@@ -699,6 +781,17 @@ app.get('/', (req, res) => {
         <button class="menu-item" onclick="switchView('click')">⚡ Live Klik (Max 100)</button>
 
         <div id="adminPanel" class="test-box hidden">
+            <p style="font-size:11px; font-weight:bold; color:#ef4444; margin-bottom:2px;">🚫 GEO-BLOCKING SETTINGS:</p>
+            <label style="font-size:10px; color:#cbd5e1;">Kode Negara (Pisahkan Koma, misal: ID, US, IN):</label>
+            <input type="text" id="geoBlockedInput" placeholder="ID, US, IN...">
+            
+            <label style="font-size:10px; color:#cbd5e1; margin-top:4px; display:block;">Redirect URL (Untuk Negara Diblokir):</label>
+            <input type="text" id="geoRedirectInput" placeholder="https://google.com">
+            
+            <button onclick="saveGeoSettings()" style="background:#ef4444; margin-top:8px;">💾 Simpan Filter Negara</button>
+
+            <hr style="border:0; border-top:1px solid #334155; margin:12px 0;">
+
             <p style="font-size:11px; font-weight:bold; color:#38bdf8;">🔗 SMARTLINK GENERATOR:</p>
             <input type="text" id="genSubId" placeholder="Sub ID (misal: fb_ads)...">
             <button onclick="generateLink()" style="background:#3b82f6;">Buat Link Tracking</button>
@@ -708,7 +801,7 @@ app.get('/', (req, res) => {
                 <button onclick="copyGeneratedLink()" style="background:#059669; margin-top:4px;">📋 Salin Link</button>
             </div>
 
-            <hr style="border:0; border-top:1px solid #334155; margin:10px 0;">
+            <hr style="border:0; border-top:1px solid #334155; margin:12px 0;">
 
             <p style="font-size:11px; font-weight:bold; color:#10b981;">⚡ SIMULATOR:</p>
             <select id="sim-subid">
@@ -859,11 +952,45 @@ app.get('/', (req, res) => {
                 document.getElementById('loginOverlay').style.display = 'none';
                 if (userRole === 'admin') {
                     document.getElementById('adminPanel').classList.remove('hidden');
+                    loadGeoSettings();
                 } else {
                     document.getElementById('adminPanel').classList.add('hidden');
                 }
             } else {
                 document.getElementById('loginOverlay').style.display = 'flex';
+            }
+        }
+
+        async function loadGeoSettings() {
+            try {
+                var res = await fetch('/api/geo-settings');
+                if (res.ok) {
+                    var data = await res.json();
+                    document.getElementById('geoBlockedInput').value = (data.blockedCountries || []).join(', ');
+                    document.getElementById('geoRedirectInput').value = data.redirectUrl || 'https://google.com';
+                }
+            } catch (e) {}
+        }
+
+        async function saveGeoSettings() {
+            var blockedStr = document.getElementById('geoBlockedInput').value;
+            var redirectUrlStr = document.getElementById('geoRedirectInput').value;
+
+            try {
+                var res = await fetch('/api/geo-settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ blockedCountries: blockedStr, redirectUrl: redirectUrlStr })
+                });
+
+                if (res.ok) {
+                    var data = await res.json();
+                    alert('✅ ' + data.message);
+                } else {
+                    alert('❌ Gagal menyimpan pengaturan!');
+                }
+            } catch (e) {
+                alert('❌ Terjadi kesalahan!');
             }
         }
 
@@ -903,6 +1030,10 @@ app.get('/', (req, res) => {
                     var data = await res.json();
                     allClicks = data.clicksHistory || [];
                     allConversions = data.conversionsHistory || [];
+                    if (data.settings && userRole === 'admin') {
+                        document.getElementById('geoBlockedInput').value = (data.settings.blockedCountries || []).join(', ');
+                        document.getElementById('geoRedirectInput').value = data.settings.redirectUrl || 'https://google.com';
+                    }
                     setPreset('today');
                 }
             } catch (err) {}
@@ -1235,12 +1366,13 @@ app.get('/', (req, res) => {
                     var dev = c.deviceInfo || { osIcon: 'fa-desktop', osClass: 'os-desktop', browserType: 'globe', osName: 'Desktop', browserName: 'Browser' };
                     var browserImgHtml = getBrowserIconHtml(dev.browserType || 'globe');
                     var refText = c.referrer || 'Direct / None';
+                    var blockedBadge = c.isBlocked ? '<span class="badge-blocked">BLOCKED</span>' : '';
 
                     var tr = document.createElement('tr');
                     tr.innerHTML = '<td>' + formattedTime + '</td>' +
                         '<td><span class="badge-subid">' + c.sub_id + '</span></td>' +
                         '<td><code>' + c.ip + '</code></td>' +
-                        '<td>' + (c.flag || getFlagEmoji('XX')) + ' ' + c.country + '</td>' +
+                        '<td>' + (c.flag || getFlagEmoji('XX')) + ' ' + c.country + blockedBadge + '</td>' +
                         '<td><span class="badge-referrer">' + refText + '</span></td>' +
                         '<td><div class="device-badge"><i class="fa-brands ' + dev.osIcon + ' ' + (dev.osClass || '') + '"></i> ' + browserImgHtml + '</div></td>';
                     tbodyClick.appendChild(tr);
